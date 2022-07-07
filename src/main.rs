@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::io::{stdout, Write};
 use crossterm::{event::{self, Event}, cursor, terminal, ExecutableCommand};
 
 mod life;
@@ -11,14 +11,15 @@ const ALIVE_CELL: char = '#';
 const TICK_DELAY_MILIS: u64 = 50;
 
 fn main() {
-    let mut life = Life::new((100, 100), DEAD_CELL, ALIVE_CELL);
+    let mut life = Life::new((115, 60), DEAD_CELL, ALIVE_CELL);
     get_initial_board(&mut life);
 
     while !life.is_dead() {
         life.tick();
         clear();
         cursor_origin();
-        print!("\n{}", life);
+        print!("{}\n", life);
+        stdout().flush().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(TICK_DELAY_MILIS));
     }
 
