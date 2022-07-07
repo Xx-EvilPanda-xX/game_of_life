@@ -10,7 +10,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 6 {
-        println!("USAGE: {} [width] [height] [dead_cell (`_` for space)] [alive_cell] [tick_delay_milis]", args[0]);
+        println!("USAGE: {} [width] [height] [dead_cell (`_` => ' ', 'h' => '#', 'a' => '`')] [alive_cell] [tick_delay_milis]", args[0]);
         std::process::exit(-1);
     }
 
@@ -19,6 +19,8 @@ fn main() {
                                             args[2].parse().expect("Failed to parse height")),
                                             match args[3].parse().expect("Failed to parse dead cell char") {
                                                 '_' => ' ',
+                                                'h' => '#',
+                                                'a' => '`',
                                                 c => c
                                             },
                                             args[4].parse().expect("Failed to parse alive cell char"));
