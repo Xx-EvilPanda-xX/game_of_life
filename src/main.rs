@@ -1,35 +1,47 @@
-use std::io::stdout;
+use std::io::{stdout, Write};
+use std::env;
 use crossterm::{event::{self, Event}, cursor, terminal, ExecutableCommand};
+use life::Life;
+use life::Cell;
 
 mod life;
-use life::Life;
-
-use crate::life::Cell;
-
-const DEAD_CELL: char = ' ';
-const ALIVE_CELL: char = '#';
-const TICK_DELAY_MILIS: u64 = 50;
 
 fn main() {
-    let mut life = Life::new((100, 100), DEAD_CELL, ALIVE_CELL);
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() != 6 {
+        println!("USAGE: {} [width] [height] [dead_cell (`_` for space)] [alive_cell] [tick_delay_milis]", args[0]);
+        std::process::exit(-1);
+    }
+
+    let tick_delay = args[5].parse().expect("Failed to parse tick delay");
+    let mut life = Life::new((args[1].parse().expect("Failed to parse width"),
+                                            args[2].parse().expect("Failed to parse height")),
+                                            match args[3].parse().expect("Failed to parse dead cell char") {
+                                                '_' => ' ',
+                                                c => c
+                                            },
+                                            args[4].parse().expect("Failed to parse alive cell char"));
     get_initial_board(&mut life);
 
     while !life.is_dead() {
         life.tick();
         clear();
-        cursor_origin();
-        print!("\n{}", life);
-        std::thread::sleep(std::time::Duration::from_millis(TICK_DELAY_MILIS));
+        cursor_move(0, 0);
+        print!("{}\n", life);
+        stdout().flush().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(tick_delay));
     }
 
     println!("\n\n\n----------------------------------------------\n All cells died!\n----------------------------------------------\n");
 }
 
 fn get_initial_board(life: &mut Life) {
+    // print setup board
     clear();
-    cursor_origin();
+    cursor_move(0, 0);
     print!("{}", life);
-    cursor_origin();
+    cursor_move(2, 1);
 
     loop {
         match event::read().expect("An error occured while getting input") {
@@ -61,8 +73,8 @@ fn get_initial_board(life: &mut Life) {
                 event::KeyCode::Char(' ') => {
                     print!("{}", match life.toggle_cell(life.cursor_pos) {
                         Ok(cell) => match cell {
-                            Cell::Dead => DEAD_CELL,
-                            Cell::Alive => ALIVE_CELL
+                            Cell::Dead => life.dead_cell,
+                            Cell::Alive => life.alive_cell
                         }
                         Err(_) => { ' ' }
                     });
@@ -80,6 +92,6 @@ fn clear() {
     stdout().execute(terminal::Clear(terminal::ClearType::All)).unwrap();
 }
 
-fn cursor_origin() {
-    stdout().execute(cursor::MoveTo(0, 0)).unwrap();
+fn cursor_move(x: u16, y: u16) {
+    stdout().execute(cursor::MoveTo(x, y)).unwrap();
 }
