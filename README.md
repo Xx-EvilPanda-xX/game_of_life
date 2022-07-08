@@ -2,10 +2,15 @@
 
 ## Usage:
 arg 1: field width in characters
+
 arg 2: field height in characters
+
 arg 3: dead cell character (with a as accent, h as hash, and underscore as space)
+
 arg 4: alive cell character (with a as accent, h as hash, and underscore as space)
+
 arg 5: delay in miliseconds after tick has finished (note: that will not necassarily mean that each tick will actually be this long)
+
 
 When in inital board selection:
 - space to toggle selected cell
