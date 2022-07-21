@@ -5,26 +5,26 @@ pub struct Life {
     board: Board,
     pub dead_cell: char,
     pub alive_cell: char,
-    dead: bool
+    dead: bool,
 }
 
 struct Board {
     width: usize,
     height: usize,
-    cells: Vec<Cell>
+    cells: Vec<Cell>,
 }
 
 #[derive(PartialEq, Copy)]
 pub enum Cell {
     Dead,
-    Alive
+    Alive,
 }
 
 impl Clone for Cell {
     fn clone(&self) -> Self {
         match self {
             Cell::Dead => Cell::Dead,
-            Cell::Alive => Cell::Alive
+            Cell::Alive => Cell::Alive,
         }
     }
 }
@@ -36,18 +36,24 @@ impl Life {
         let (w, h) = board_dims;
         let cells = Life::init_board(Cell::Dead, w * h);
 
-        Life { board: Board {
-            width: w,
-            height: h,
-            cells
-        }, dead_cell, alive_cell, dead: false, cursor_pos: (0, 0) }
+        Life {
+            board: Board {
+                width: w,
+                height: h,
+                cells,
+            },
+            dead_cell,
+            alive_cell,
+            dead: false,
+            cursor_pos: (0, 0),
+        }
     }
 
     fn init_board(cell: Cell, size: usize) -> Vec<Cell> {
         let mut cells = Vec::with_capacity(size);
-        
+
         for _ in 0..size {
-            cells.push(cell.clone());
+            cells.push(cell);
         }
 
         cells
@@ -61,10 +67,10 @@ impl Life {
 
         self.board.cells[index] = match self.board.cells[index] {
             Cell::Dead => Cell::Alive,
-            Cell::Alive => Cell::Dead
+            Cell::Alive => Cell::Dead,
         };
 
-        Ok(self.board.cells[index].clone())
+        Ok(self.board.cells[index])
     }
 
     pub fn tick(&mut self) {
@@ -73,9 +79,14 @@ impl Life {
             return;
         }
 
-        if self.board.cells.iter()
-        .filter(|cell| **cell == Cell::Alive)
-        .count() == 0 {
+        if self
+            .board
+            .cells
+            .iter()
+            .filter(|cell| **cell == Cell::Alive)
+            .count()
+            == 0
+        {
             self.dead = true;
             return;
         }
@@ -83,7 +94,8 @@ impl Life {
         let mut new_board = Life::init_board(Cell::Dead, self.board.width * self.board.height);
 
         for (i, cell) in self.board.cells.iter().enumerate() {
-            let alive = Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
+            let alive =
+                Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
 
             new_board[i] = match cell {
                 Cell::Dead => {
@@ -92,7 +104,7 @@ impl Life {
                     } else {
                         Cell::Dead
                     }
-                },
+                }
                 Cell::Alive => {
                     if alive == 2 || alive == 3 {
                         Cell::Alive
@@ -100,14 +112,13 @@ impl Life {
                         Cell::Dead
                     }
                 }
-            } 
+            }
         }
 
         self.board.cells = new_board;
     }
 
-    fn alive_neighbors(pos: Pos, board: &Board) -> usize
-    {
+    fn alive_neighbors(pos: Pos, board: &Board) -> usize {
         // cool iterator stuff but slow
 
         // board.cells.iter().enumerate().filter(|(i, _)| {
@@ -131,10 +142,10 @@ impl Life {
 
         // fast but boring
         let mut neighbors = [Cell::Dead; 8];
-        if pos.0 < board.width - 1 && pos.1 < board.height - 1 { 
+        if pos.0 < board.width - 1 && pos.1 < board.height - 1 {
             neighbors[0] = Life::at_pos((pos.0 + 1, pos.1 + 1), board);
         }
-        if pos.1 < board.height - 1{
+        if pos.1 < board.height - 1 {
             neighbors[1] = Life::at_pos((pos.0, pos.1 + 1), board);
         }
         if pos.0 > 0 {
@@ -155,12 +166,12 @@ impl Life {
         if pos.0 > 0 && pos.1 > 0 {
             neighbors[7] = Life::at_pos((pos.0 - 1, pos.1 - 1), board);
         }
-        
+
         let mut count = 0;
         for i in neighbors {
             match i {
-                Cell::Dead => {},
-                Cell::Alive => count += 1
+                Cell::Dead => {}
+                Cell::Alive => count += 1,
             }
         }
 
@@ -172,7 +183,7 @@ impl Life {
             return Cell::Dead;
         }
 
-        board.cells[pos.1 * board.width + pos.0].clone()
+        board.cells[pos.1 * board.width + pos.0]
     }
 
     pub fn is_dead(&self) -> bool {
@@ -181,35 +192,38 @@ impl Life {
 
     pub fn dims(&self) -> (usize, usize) {
         (self.board.width, self.board.height)
-    } 
+    }
 }
 
 impl Display for Life {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut output = String::new();
+        
         // top row of `-`
         for _ in 0..self.board.width {
-            write!(f, " -")?;
+            output.push_str(" -");
         }
-        write!(f, " -\n|")?;
+        output.push_str(" -\n|");
 
         // cells and side `|`
         for (i, cell) in self.board.cells.iter().enumerate() {
             if i % self.board.width == 0 && i != 0 {
-                write!(f, " |\n|")?;
+                output.push_str(" |\n|");
             }
-            
+
             match cell {
-                Cell::Dead => write!(f, " {}", self.dead_cell)?,
-                Cell::Alive => write!(f, " {}", self.alive_cell)?
+                Cell::Dead => output.push_str(format!(" {}", self.dead_cell).as_str()),
+                Cell::Alive => output.push_str(format!(" {}", self.alive_cell).as_str()),
             }
         }
 
         // bottom row of `-`
-        write!(f, " |\n")?;
+        output.push_str(" |\n");
         for _ in 0..self.board.width {
-            write!(f, " -")?;
+            output.push_str(" -");
         }
-        write!(f, " -\n")?;
+        output.push_str(" -\n");
+        write!(f, "{}", output)?;
 
         Ok(())
     }
