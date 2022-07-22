@@ -3,9 +3,10 @@ use std::fmt::Display;
 pub struct Life {
     pub cursor_pos: Pos,
     board: Board,
+    inital_state: Board,
     pub dead_cell: char,
     pub alive_cell: char,
-    dead: bool,
+    pub dead: bool,
 }
 
 struct Board {
@@ -34,18 +35,34 @@ pub type Pos = (usize, usize);
 impl Life {
     pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char) -> Self {
         let (w, h) = board_dims;
-        let cells = Life::init_board(Cell::Dead, w * h);
 
         Life {
             board: Board {
                 width: w,
                 height: h,
-                cells,
+                cells: Life::init_board(Cell::Dead, w * h),
+            },
+            inital_state: Board {
+                width: w,
+                height: h,
+                cells: Life::init_board(Cell::Dead, w * h)
             },
             dead_cell,
             alive_cell,
             dead: false,
             cursor_pos: (0, 0),
+        }
+    }
+
+    pub fn save_state(&mut self) {
+        for (i, cell) in self.board.cells.iter().enumerate() {
+            self.inital_state.cells[i] = *cell;
+        }
+    }
+
+    pub fn load_inital(&mut self) {
+        for (i, cell) in self.inital_state.cells.iter().enumerate() {
+            self.board.cells[i] = *cell;
         }
     }
 
@@ -94,8 +111,7 @@ impl Life {
         let mut new_board = Life::init_board(Cell::Dead, self.board.width * self.board.height);
 
         for (i, cell) in self.board.cells.iter().enumerate() {
-            let alive =
-                Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
+            let alive = Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
 
             new_board[i] = match cell {
                 Cell::Dead => {
@@ -184,10 +200,6 @@ impl Life {
         }
 
         board.cells[pos.1 * board.width + pos.0]
-    }
-
-    pub fn is_dead(&self) -> bool {
-        self.dead
     }
 
     pub fn dims(&self) -> (usize, usize) {

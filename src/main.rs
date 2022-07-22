@@ -37,18 +37,47 @@ fn main() {
             c => c,
         },
     );
-    get_initial_board(&mut life);
 
-    while !life.is_dead() {
-        life.tick();
-        clear();
-        cursor_move(0, 0);
-        println!("{}", life);
-        stdout().flush().unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(tick_delay));
+    let mut cont = false;
+    loop {
+        get_initial_board(&mut life);
+        life.save_state();
+
+        while !life.dead {
+            life.tick();
+            clear();
+            cursor_move(0, 0);
+            println!("{}", life);
+            stdout().flush().unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(tick_delay));
+            
+            crossterm::terminal::enable_raw_mode().unwrap();
+            if let Ok(true) = event::poll(std::time::Duration::from_millis(50)) {
+                if let Event::Key(key) = event::read().expect("An error occured while getting input") {
+                    match key.code {
+                        event::KeyCode::Char('r') => {
+                            life.load_inital();
+                            life.dead = false;
+                            life.cursor_pos = (0, 0);
+                            crossterm::terminal::disable_raw_mode().unwrap();
+                            cont = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            crossterm::terminal::disable_raw_mode().unwrap();
+        }
+
+        if cont {
+            cont = false;
+            continue;
+        }
+
+        println!("\n\n\n----------------------------------------------\n All cells died!\n----------------------------------------------\n");
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
-
-    println!("\n\n\n----------------------------------------------\n All cells died!\n----------------------------------------------\n");
 }
 
 fn get_initial_board(life: &mut Life) {
@@ -58,6 +87,7 @@ fn get_initial_board(life: &mut Life) {
     print!("{}", life);
     cursor_move(2, 1);
 
+    crossterm::terminal::enable_raw_mode().unwrap();
     loop {
         if let Event::Key(key) = event::read().expect("An error occured while getting input") {
             match key.code {
@@ -105,6 +135,7 @@ fn get_initial_board(life: &mut Life) {
             }
         }
     }
+    crossterm::terminal::disable_raw_mode().unwrap();
 }
 
 fn clear() {
