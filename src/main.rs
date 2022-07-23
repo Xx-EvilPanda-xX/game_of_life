@@ -13,14 +13,14 @@ mod life;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 6 {
-        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [tick_delay_milis]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`')", args[0]);
+    if args.len() != 7 {
+        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`')", args[0]);
         std::process::exit(-1);
     }
 
     let board_width = args[1].parse().expect("Failed to parse width");
     let board_height = args[2].parse().expect("Failed to parse height");
-    let mut tick_delay = args[5].parse().expect("Failed to parse tick delay");
+    let mut tick_delay = args[6].parse().expect("Failed to parse tick delay");
     let mut life = Life::new(
         (board_width, board_height),
         match args[3].parse().expect("Failed to parse dead cell char") {
@@ -35,6 +35,7 @@ fn main() {
             'a' => '`',
             c => c,
         },
+        args[5].parse().expect("Failed to parse is_rand")
     );
     
     stdout().execute(cursor::Hide).unwrap();

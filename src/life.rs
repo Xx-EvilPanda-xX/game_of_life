@@ -33,19 +33,19 @@ impl Clone for Cell {
 pub type Pos = (usize, usize);
 
 impl Life {
-    pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char) -> Self {
+    pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char, is_rand: bool) -> Self {
         let (w, h) = board_dims;
 
         Life {
             board: Board {
                 width: w,
                 height: h,
-                cells: Life::init_board(Cell::Dead, w * h),
+                cells: Life::init_board(Cell::Dead, w * h, is_rand),
             },
             inital_state: Board {
                 width: w,
                 height: h,
-                cells: Life::init_board(Cell::Dead, w * h)
+                cells: Life::init_board(Cell::Dead, w * h, false)
             },
             dead_cell,
             alive_cell,
@@ -72,11 +72,20 @@ impl Life {
         self.cursor_pos = (0, 0);
     }
 
-    fn init_board(cell: Cell, size: usize) -> Vec<Cell> {
+    fn init_board(cell: Cell, size: usize, random: bool) -> Vec<Cell> {
         let mut cells = Vec::with_capacity(size);
 
         for _ in 0..size {
-            cells.push(cell);
+            cells.push(
+                if random {
+                    if rand::random() {
+                        Cell::Alive
+                    } else {
+                        Cell::Dead
+                    }
+                } else {
+                    cell
+                });
         }
 
         cells
@@ -114,7 +123,7 @@ impl Life {
             return;
         }
 
-        let mut new_board = Life::init_board(Cell::Dead, self.board.width * self.board.height);
+        let mut new_board = Life::init_board(Cell::Dead, self.board.width * self.board.height, false);
 
         for (i, cell) in self.board.cells.iter().enumerate() {
             let alive = Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
