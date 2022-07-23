@@ -1,12 +1,12 @@
 use crossterm::{
-    cursor,
-    event::{self, Event},
-    terminal, ExecutableCommand,
+    cursor, event, terminal, ExecutableCommand,
 };
 use life::Cell;
 use life::Life;
 use std::env;
-use std::io::{stdout, Write};
+use std::io::stdout;
+use std::sync::mpsc;
+use std::thread;
 
 mod life;
 
@@ -18,12 +18,11 @@ fn main() {
         std::process::exit(-1);
     }
 
-    let tick_delay = args[5].parse().expect("Failed to parse tick delay");
+    let board_width = args[1].parse().expect("Failed to parse width");
+    let board_height = args[2].parse().expect("Failed to parse height");
+    let mut tick_delay = args[5].parse().expect("Failed to parse tick delay");
     let mut life = Life::new(
-        (
-            args[1].parse().expect("Failed to parse width"),
-            args[2].parse().expect("Failed to parse height"),
-        ),
+        (board_width, board_height),
         match args[3].parse().expect("Failed to parse dead cell char") {
             '_' => ' ',
             'h' => '#',
@@ -37,10 +36,28 @@ fn main() {
             c => c,
         },
     );
+    
+    stdout().execute(cursor::Hide).unwrap();
+    terminal::enable_raw_mode().unwrap();
 
-    let mut cont = false;
-    loop {
-        get_initial_board(&mut life);
+    let (key_tx, key_rx) = mpsc::channel::<event::KeyCode>();
+    let (kill_tx, kill_rx) = mpsc::channel::<()>();
+
+    let input_thread = thread::spawn(move || {
+        while kill_rx.try_recv().is_err() {
+            if let Ok(true) = event::poll(std::time::Duration::from_millis(0)) {
+                if let event::Event::Key(key) = event::read().expect("An error occured while getting input") {
+                    key_tx.send(key.code).unwrap();
+                }
+            }
+        }
+    });
+
+    'outer: loop {
+        if get_initial_board(&mut life, &key_rx) {
+            cursor_move(0, (board_height + 2) as u16);
+            break;
+        }
         life.save_state();
 
         while !life.dead {
@@ -48,49 +65,46 @@ fn main() {
             clear();
             cursor_move(0, 0);
             println!("{}", life);
-            stdout().flush().unwrap();
             std::thread::sleep(std::time::Duration::from_millis(tick_delay));
             
-            crossterm::terminal::enable_raw_mode().unwrap();
-            if let Ok(true) = event::poll(std::time::Duration::from_millis(50)) {
-                if let Event::Key(key) = event::read().expect("An error occured while getting input") {
-                    match key.code {
-                        event::KeyCode::Char('r') => {
-                            life.load_inital();
-                            life.dead = false;
-                            life.cursor_pos = (0, 0);
-                            crossterm::terminal::disable_raw_mode().unwrap();
-                            cont = true;
-                            break;
-                        }
-                        _ => {}
+            while let Ok(code) = key_rx.try_recv() {
+                match code {
+                    event::KeyCode::Char('r') => {
+                        life.reset();
+                        continue 'outer;
                     }
+                    event::KeyCode::Up if tick_delay > 0 => tick_delay -= tick_delay / 10 + 1,
+                    event::KeyCode::Down if tick_delay < 1000 => tick_delay += tick_delay / 10 + 1,
+                    event::KeyCode::Esc => {
+                        break 'outer;
+                    }
+                    _ => {}
                 }
-            }
-            crossterm::terminal::disable_raw_mode().unwrap();
+            }            
         }
 
-        if cont {
-            cont = false;
-            continue;
-        }
-
-        println!("\n\n\n----------------------------------------------\n All cells died!\n----------------------------------------------\n");
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        life.reset();
+        println!("\n\r\n\r\n\r----------------------------------------------\n\r All cells died!\n\r----------------------------------------------\n\r");
+        std::thread::sleep(std::time::Duration::from_millis(1500));
     }
+
+    kill_tx.send(()).unwrap();
+    input_thread.join().unwrap();
+    terminal::disable_raw_mode().unwrap();
+    stdout().execute(cursor::Show).unwrap();
 }
 
-fn get_initial_board(life: &mut Life) {
+fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>) -> bool {
     // print setup board
     clear();
     cursor_move(0, 0);
     print!("{}", life);
     cursor_move(2, 1);
+    stdout().execute(cursor::Show).unwrap();
 
-    crossterm::terminal::enable_raw_mode().unwrap();
     loop {
-        if let Event::Key(key) = event::read().expect("An error occured while getting input") {
-            match key.code {
+        if let Ok(code) = rx.recv() {
+            match code {
                 event::KeyCode::Up => {
                     if life.cursor_pos.1 > 0 {
                         stdout().execute(cursor::MoveUp(1)).unwrap();
@@ -131,11 +145,14 @@ fn get_initial_board(life: &mut Life) {
                     stdout().execute(cursor::MoveLeft(1)).unwrap();
                 }
                 event::KeyCode::Enter => break,
+                event::KeyCode::Esc => return true,
                 _ => {}
             }
         }
     }
-    crossterm::terminal::disable_raw_mode().unwrap();
+
+    stdout().execute(cursor::Hide).unwrap();
+    false
 }
 
 fn clear() {

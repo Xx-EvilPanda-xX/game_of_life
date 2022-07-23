@@ -66,6 +66,12 @@ impl Life {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.load_inital();
+        self.dead = false;
+        self.cursor_pos = (0, 0);
+    }
+
     fn init_board(cell: Cell, size: usize) -> Vec<Cell> {
         let mut cells = Vec::with_capacity(size);
 
@@ -208,19 +214,19 @@ impl Life {
 }
 
 impl Display for Life {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {        
         let mut output = String::new();
         
         // top row of `-`
         for _ in 0..self.board.width {
             output.push_str(" -");
         }
-        output.push_str(" -\n|");
+        output.push_str(" -\n\r|");
 
         // cells and side `|`
         for (i, cell) in self.board.cells.iter().enumerate() {
             if i % self.board.width == 0 && i != 0 {
-                output.push_str(" |\n|");
+                output.push_str(" |\n\r|");
             }
 
             match cell {
@@ -230,11 +236,11 @@ impl Display for Life {
         }
 
         // bottom row of `-`
-        output.push_str(" |\n");
+        output.push_str(" |\n\r");
         for _ in 0..self.board.width {
             output.push_str(" -");
         }
-        output.push_str(" -\n");
+        output.push_str(" -\n\r");
         write!(f, "{}", output)?;
 
         Ok(())
