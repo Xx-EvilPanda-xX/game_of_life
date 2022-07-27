@@ -5,6 +5,7 @@ use life::Cell;
 use life::Life;
 use std::env;
 use std::io::stdout;
+use std::io::Write;
 use std::sync::mpsc;
 use std::thread;
 
@@ -20,6 +21,13 @@ fn main() {
 
     let board_width = args[1].parse().expect("Failed to parse width");
     let board_height = args[2].parse().expect("Failed to parse height");
+    let term_size = (terminal::size().unwrap().0 as usize, terminal::size().unwrap().1 as usize);
+
+    if (board_width + 1) * 2 > term_size.0 || board_height + 3 > term_size.1 {
+        eprintln!("Error: terminal not large enough for specified dimensions.");
+        std::process::exit(-1);
+    }
+
     let mut tick_delay = args[6].parse().expect("Failed to parse tick delay");
     let mut life = Life::new(
         (board_width, board_height),
@@ -35,7 +43,8 @@ fn main() {
             'a' => '`',
             c => c,
         },
-        args[5].parse().expect("Failed to parse is_rand")
+        args[5].parse().expect("Failed to parse is_rand"),
+        None
     );
     
     stdout().execute(cursor::Hide).unwrap();
@@ -65,7 +74,8 @@ fn main() {
             life.tick();
             clear();
             cursor_move(0, 0);
-            println!("{}", life);
+            print!("{}", life);
+            stdout().flush().unwrap();
             std::thread::sleep(std::time::Duration::from_millis(tick_delay));
             
             while let Ok(code) = key_rx.try_recv() {
@@ -76,9 +86,7 @@ fn main() {
                     }
                     event::KeyCode::Up if tick_delay > 0 => tick_delay -= tick_delay / 10 + 1,
                     event::KeyCode::Down if tick_delay < 1000 => tick_delay += tick_delay / 10 + 1,
-                    event::KeyCode::Esc => {
-                        break 'outer;
-                    }
+                    event::KeyCode::Esc => break 'outer,
                     _ => {}
                 }
             }            
@@ -95,6 +103,12 @@ fn main() {
     stdout().execute(cursor::Show).unwrap();
 }
 
+enum InputMode {
+    Toggle,
+    SetAlive,
+    SetDead
+}
+
 fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>) -> bool {
     // print setup board
     clear();
@@ -103,8 +117,12 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>) -> bo
     cursor_move(2, 1);
     stdout().execute(cursor::Show).unwrap();
 
+    let mut input_mode = InputMode::Toggle;
+    
     loop {
         if let Ok(code) = rx.recv() {
+            let char_cells = (life.dead_cell, life.alive_cell);
+
             match code {
                 event::KeyCode::Up => {
                     if life.cursor_pos.1 > 0 {
@@ -131,22 +149,28 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>) -> bo
                     }
                 }
                 event::KeyCode::Char(' ') => {
-                    print!(
-                        "{}",
-                        match life.toggle_cell(life.cursor_pos) {
-                            Ok(cell) => match cell {
-                                Cell::Dead => life.dead_cell,
-                                Cell::Alive => life.alive_cell,
-                            },
-                            Err(_) => {
-                                ' '
-                            }
-                        }
-                    );
-                    stdout().execute(cursor::MoveLeft(1)).unwrap();
+                    if let InputMode::Toggle = input_mode {
+                        print_to_board(char_cells, life.toggle_cell(life.cursor_pos));
+                    }
                 }
+                event::KeyCode::Char('s') => {
+
+                }
+                event::KeyCode::Char('1') => input_mode = InputMode::Toggle,
+                event::KeyCode::Char('2') => input_mode = InputMode::SetAlive,
+                event::KeyCode::Char('3') => input_mode = InputMode::SetDead,
                 event::KeyCode::Enter => break,
                 event::KeyCode::Esc => return true,
+                _ => {}
+            }
+
+            match input_mode {
+                InputMode::SetAlive => {
+                    print_to_board(char_cells, life.set_cell(life.cursor_pos, life::Cell::Alive));
+                }
+                InputMode::SetDead => {
+                    print_to_board(char_cells, life.set_cell(life.cursor_pos, life::Cell::Dead));
+                }
                 _ => {}
             }
         }
@@ -154,6 +178,22 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>) -> bo
 
     stdout().execute(cursor::Hide).unwrap();
     false
+}
+
+fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
+    print!(
+        "{}",
+        match cell {
+            Ok(cell) => match cell {
+                Cell::Dead => cell_chars.0,
+                Cell::Alive => cell_chars.1,
+            },
+            Err(_) => {
+                ' '
+            }
+        }
+    );
+    stdout().execute(cursor::MoveLeft(1)).unwrap();
 }
 
 fn clear() {

@@ -9,7 +9,7 @@ pub struct Life {
     pub dead: bool,
 }
 
-struct Board {
+pub struct Board {
     width: usize,
     height: usize,
     cells: Vec<Cell>,
@@ -33,14 +33,18 @@ impl Clone for Cell {
 pub type Pos = (usize, usize);
 
 impl Life {
-    pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char, is_rand: bool) -> Self {
+    pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char, is_rand: bool, board: Option<Board>) -> Self {
         let (w, h) = board_dims;
 
         Life {
-            board: Board {
-                width: w,
-                height: h,
-                cells: Life::init_board(Cell::Dead, w * h, is_rand),
+            board: if let Some(board) = board {
+                board
+            } else {
+                Board {
+                    width: w,
+                    height: h,
+                    cells: Life::init_board(Cell::Dead, w * h, is_rand),
+                }
             },
             inital_state: Board {
                 width: w,
@@ -85,23 +89,30 @@ impl Life {
                     }
                 } else {
                     cell
-                });
+                }
+            );
         }
 
         cells
     }
 
     pub fn toggle_cell(&mut self, pos: Pos) -> Result<Cell, ()> {
+        self.set_cell(
+            pos,
+            match Life::at_pos(pos, &self.board) {
+                Cell::Dead => Cell::Alive,
+                Cell::Alive => Cell::Dead,
+            }
+        )
+    }
+
+    pub fn set_cell(&mut self, pos: Pos, cell: Cell) -> Result<Cell, ()> {
         let index = pos.1 * self.board.width + pos.0;
         if index >= self.board.cells.len() {
             return Err(());
         }
 
-        self.board.cells[index] = match self.board.cells[index] {
-            Cell::Dead => Cell::Alive,
-            Cell::Alive => Cell::Dead,
-        };
-
+        self.board.cells[index] = cell;
         Ok(self.board.cells[index])
     }
 
