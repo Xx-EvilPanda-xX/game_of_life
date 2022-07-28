@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 crossterm="0.24.0"
 rand = "0.8.5"
+savefile = "0.10.1"
+savefile-derive = "0.10.1"

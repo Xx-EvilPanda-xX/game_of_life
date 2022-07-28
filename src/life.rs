@@ -1,24 +1,41 @@
 use std::fmt::Display;
+use savefile_derive::*;
 
 pub struct Life {
     pub cursor_pos: Pos,
-    board: Board,
-    inital_state: Board,
     pub dead_cell: char,
     pub alive_cell: char,
-    pub dead: bool,
+    pub board: Board,
+    inital_state: Board,
+    dead: bool,
 }
 
+#[derive(Savefile)]
 pub struct Board {
-    width: usize,
-    height: usize,
+    pub width: usize,
+    pub height: usize,
     cells: Vec<Cell>,
 }
 
-#[derive(PartialEq, Copy)]
+#[derive(Savefile)]
 pub enum Cell {
     Dead,
     Alive,
+}
+
+impl PartialEq for Cell {
+    fn eq(&self, other: &Cell) -> bool {
+        match self {
+            Cell::Dead => match other {
+                Cell::Dead => true,
+                Cell::Alive => false
+            }
+            Cell::Alive => match other {
+                Cell::Dead => false,
+                Cell::Alive => true
+            }
+        }
+    }
 }
 
 impl Clone for Cell {
@@ -29,6 +46,8 @@ impl Clone for Cell {
         }
     }
 }
+
+impl Copy for Cell {}
 
 pub type Pos = (usize, usize);
 
@@ -231,6 +250,10 @@ impl Life {
     pub fn dims(&self) -> (usize, usize) {
         (self.board.width, self.board.height)
     }
+
+    pub fn is_dead(&self) -> bool {
+        self.dead
+    }
 }
 
 impl Display for Life {
@@ -260,7 +283,7 @@ impl Display for Life {
         for _ in 0..self.board.width {
             output.push_str(" -");
         }
-        output.push_str(" -\n\r");
+        output.push_str(" -");
         write!(f, "{}", output)?;
 
         Ok(())
