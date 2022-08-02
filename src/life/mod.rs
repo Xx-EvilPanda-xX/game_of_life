@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use savefile_derive::*;
 
+pub mod prefabs;
+
 pub struct Life {
     pub cursor_pos: Pos,
     pub dead_cell: char,
@@ -8,6 +10,20 @@ pub struct Life {
     pub board: Board,
     inital_state: Board,
     dead: bool,
+}
+
+pub mod prefab {
+    pub struct Prefab<const SIZE: usize> {
+        pub width: usize,
+        pub height: usize,
+        pub cells: [super::Pos; SIZE]
+    }
+    
+    pub enum PrefabPlaceError {
+        OutOfBounds(bool, bool),
+        InvalidCellPos(super::Pos),
+        CellOverlap
+    }
 }
 
 #[derive(Savefile)]
@@ -245,6 +261,35 @@ impl Life {
         }
 
         board.cells[pos.1 * board.width + pos.0]
+    }
+
+    pub fn place_prefab(&mut self, prefab: &dyn prefabs::Prefabable) -> Result<(), prefab::PrefabPlaceError> {
+        use prefab::PrefabPlaceError;
+        
+        let check_x = self.cursor_pos.0 + prefab.width() >= self.board.width + 1;
+        let check_y = self.cursor_pos.1 + prefab.height() >= self.board.height + 1;
+
+        if check_x || check_y {
+            return Err(PrefabPlaceError::OutOfBounds(check_x, check_y));
+        }
+
+        for x in self.cursor_pos.0..self.cursor_pos.0 + prefab.width() {
+            for y in self.cursor_pos.1..self.cursor_pos.1 + prefab.height() {
+                if Life::at_pos((x, y), &self.board) == Cell::Alive {
+                    return Err(PrefabPlaceError::CellOverlap);
+                }
+            }
+        }
+
+        for pos in prefab.cells().iter() {
+            if pos.0 >= prefab.width() || pos.1 >= prefab.height() {
+                return Err(PrefabPlaceError::InvalidCellPos((pos.0, pos.1)));
+            }
+
+            self.set_cell((self.cursor_pos.0 + pos.0, self.cursor_pos.1 + pos.1), Cell::Alive).unwrap();
+        }
+
+        Ok(())
     }
 
     pub fn dims(&self) -> (usize, usize) {

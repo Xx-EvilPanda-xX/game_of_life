@@ -3,6 +3,8 @@ use crossterm::{
 };
 use life::Cell;
 use life::Life;
+use life::prefab;
+use life::prefabs;
 use std::env;
 use std::io::stdout;
 use std::io::Write;
@@ -20,29 +22,28 @@ fn main() {
         std::process::exit(-1);
     }
 
-    let board_width;
-    let board_height;
-
-    let board = if args.len() == 8 { 
+    let (board_width, board_height, board) = if args.len() == 8 { 
         let board = get_saved_board(Path::new(args[7].as_str()));
-        if let Some(board) = board.as_ref() {
-            board_width = board.width;
-            board_height = board.height;
+        if let Some(b) = board.as_ref() {
+            (b.width, b.height, board)
         } else {
             eprintln!("Error: the specified board save could not be loaded. Please make sure it exsits before trying again.");
             std::process::exit(-1);
         }
-        board
     } else {
-        board_width = args[1].parse().expect("Failed to parse width");
-        board_height = args[2].parse().expect("Failed to parse height");
+        (
+        args[1].parse().expect("Failed to parse width"),
+        args[2].parse().expect("Failed to parse height"),
         None
+        )
     };
 
     let term_size = (terminal::size().unwrap().0 as usize, terminal::size().unwrap().1 as usize);
 
-    if (board_width + 1) * 2 > term_size.0 || board_height + 3 > term_size.1 {
-        eprintln!("Error: terminal not large enough for specified dimensions.");
+    let check_x = (board_width + 1) * 2 > term_size.0;
+    let check_y = board_height + 3 > term_size.1;
+    if check_x || check_y {
+        eprintln!("Error: terminal not large enough for specified dimensions. x: {}, y: {}", check_x, check_y);
         std::process::exit(-1);
     }
 
@@ -133,7 +134,7 @@ fn get_saved_board(path: &Path) -> Option<life::Board> {
 
     match savefile::load_file(path_buf, 0) {
         Ok(board) => Some(board),
-        Err(_) => { None }
+        Err(_) => None
     }
 }
 
@@ -145,10 +146,7 @@ enum InputMode {
 
 fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board_height: usize) -> bool {
     // print setup board
-    clear();
-    cursor_move(0, 0);
-    print!("{}", life);
-    cursor_move(2, 1);
+    reprint_board(life);
     stdout().execute(cursor::Show).unwrap();
 
     let mut input_mode = InputMode::Toggle;
@@ -203,12 +201,13 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board
 
                     terminal::enable_raw_mode().unwrap();
                     
-                    clear();
-                    cursor_move(0, 0);
-                    print!("{}", life);
-                    cursor_move(2, 1);
+                    reprint_board(life);
                     life.cursor_pos = (0, 0);
                 }
+                event::KeyCode::Char('z') => if prefab(&prefabs::R_PENT, life) { return true },
+                event::KeyCode::Char('x') => if prefab(&prefabs::LWSS, life) { return true },
+                event::KeyCode::Char('c') => if prefab(&prefabs::GLIDER, life) { return true },
+                event::KeyCode::Char('v') => if prefab(&prefabs::T22, life) { return true },
                 event::KeyCode::Char('1') => input_mode = InputMode::Toggle,
                 event::KeyCode::Char('2') => input_mode = InputMode::SetAlive,
                 event::KeyCode::Char('3') => input_mode = InputMode::SetDead,
@@ -230,6 +229,32 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board
     }
 
     stdout().execute(cursor::Hide).unwrap();
+    false
+}
+
+fn reprint_board(life: &Life) {
+    clear();
+    cursor_move(0, 0);
+    print!("{}", life);
+    cursor_move(2, 1);
+}
+
+fn prefab(prefab: &dyn prefabs::Prefabable, life: &mut Life) -> bool{
+    if let Err(e) = life.place_prefab(prefab) {
+        use prefab::PrefabPlaceError;
+        match e {
+            PrefabPlaceError::InvalidCellPos(pos) => {
+                eprintln!("Invalid cell pos in prefab '{}': ({}, {})", stringify!(prefabs::r_pent), pos.0, pos.1);
+                return true;
+            }
+            _ => {}
+        }
+    } else {
+        let (x, y) = cursor::position().unwrap();
+        reprint_board(life);
+        cursor_move(x, y);
+    }
+
     false
 }
 
