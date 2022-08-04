@@ -1,16 +1,13 @@
-use crossterm::{
-    cursor, event, terminal, ExecutableCommand,
-};
+use crossterm::{cursor, event, terminal, ExecutableCommand};
+use life::prefab;
 use life::Cell;
 use life::Life;
-use life::prefab;
-use life::prefabs;
 use std::env;
 use std::io::stdout;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
-use std::path::{Path, PathBuf};
 
 mod life;
 
@@ -18,11 +15,11 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 7 && args.len() != 8 {
-        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis] OPTIONAL: [save_file]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`')", args[0]);
+        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis] OPTIONAL: [save_file]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`')\nSet the width and height to 0 for fullscreen", args[0]);
         std::process::exit(-1);
     }
 
-    let (board_width, board_height, board) = if args.len() == 8 { 
+    let (board_width, board_height, board) = if args.len() == 8 {
         let board = get_saved_board(Path::new(args[7].as_str()));
         if let Some(b) = board.as_ref() {
             (b.width, b.height, board)
@@ -32,20 +29,32 @@ fn main() {
         }
     } else {
         (
-        args[1].parse().expect("Failed to parse width"),
-        args[2].parse().expect("Failed to parse height"),
-        None
+            args[1].parse().expect("Failed to parse width"),
+            args[2].parse().expect("Failed to parse height"),
+            None,
         )
     };
 
-    let term_size = (terminal::size().unwrap().0 as usize, terminal::size().unwrap().1 as usize);
+    let term_size = (
+        terminal::size().unwrap().0 as usize,
+        terminal::size().unwrap().1 as usize,
+    );
 
     let check_x = (board_width + 1) * 2 > term_size.0;
     let check_y = board_height + 3 > term_size.1;
     if check_x || check_y {
-        eprintln!("Error: terminal not large enough for specified dimensions. x: {}, y: {}", check_x, check_y);
+        eprintln!(
+            "Error: terminal not large enough for specified dimensions. x: {}, y: {}",
+            check_x, check_y
+        );
         std::process::exit(-1);
     }
+
+    let (board_width, board_height) = if board_width == 0 && board_height == 0 {
+        (term_size.0 / 2 - 2, term_size.1 - 3)
+    } else {
+        (board_width, board_height)
+    };
 
     let mut tick_delay = args[6].parse().expect("Failed to parse tick delay");
     let mut life = Life::new(
@@ -63,9 +72,11 @@ fn main() {
             c => c,
         },
         args[5].parse().expect("Failed to parse is_rand"),
-        board
+        board,
     );
-    
+
+    let prefabs = prefab::load_prefabs();
+
     stdout().execute(cursor::Hide).unwrap();
     terminal::enable_raw_mode().unwrap();
 
@@ -75,7 +86,9 @@ fn main() {
     let input_thread = thread::spawn(move || {
         while kill_rx.try_recv().is_err() {
             if let Ok(true) = event::poll(std::time::Duration::from_millis(0)) {
-                if let event::Event::Key(key) = event::read().expect("An error occured while getting input") {
+                if let event::Event::Key(key) =
+                    event::read().expect("An error occured while getting input")
+                {
                     key_tx.send(key.code).unwrap();
                 }
             }
@@ -83,7 +96,7 @@ fn main() {
     });
 
     'outer: loop {
-        if get_initial_board(&mut life, &key_rx, board_height) {
+        if get_initial_board(&mut life, &key_rx, board_height, &prefabs) {
             cursor_move(0, (board_height + 2) as u16);
             break;
         }
@@ -96,7 +109,7 @@ fn main() {
             print!("{}", life);
             stdout().flush().unwrap();
             std::thread::sleep(std::time::Duration::from_millis(tick_delay));
-            
+
             while let Ok(code) = key_rx.try_recv() {
                 match code {
                     event::KeyCode::Char('r') => {
@@ -134,23 +147,31 @@ fn get_saved_board(path: &Path) -> Option<life::Board> {
 
     match savefile::load_file(path_buf, 0) {
         Ok(board) => Some(board),
-        Err(_) => None
+        Err(_) => None,
     }
 }
 
 enum InputMode {
     Toggle,
     SetAlive,
-    SetDead
+    SetDead,
 }
 
-fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board_height: usize) -> bool {
+fn get_initial_board(
+    life: &mut Life,
+    rx: &mpsc::Receiver<event::KeyCode>,
+    board_height: usize,
+    prefabs: &[life::Board],
+) -> bool {
     // print setup board
     reprint_board(life);
     stdout().execute(cursor::Show).unwrap();
+    if let Some((x, y)) = life.initial_cursor_pos {
+        cursor_move(x, y);
+    }
 
     let mut input_mode = InputMode::Toggle;
-    
+
     loop {
         if let Ok(code) = rx.recv() {
             let char_cells = (life.dead_cell, life.alive_cell);
@@ -200,17 +221,43 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board
                     }
 
                     terminal::enable_raw_mode().unwrap();
-                    
+
                     reprint_board(life);
                     life.cursor_pos = (0, 0);
                 }
-                event::KeyCode::Char('z') => if prefab(&prefabs::R_PENT, life) { return true },
-                event::KeyCode::Char('x') => if prefab(&prefabs::LWSS, life) { return true },
-                event::KeyCode::Char('c') => if prefab(&prefabs::GLIDER, life) { return true },
-                event::KeyCode::Char('v') => if prefab(&prefabs::T22, life) { return true },
-                event::KeyCode::Char('1') => input_mode = InputMode::Toggle,
-                event::KeyCode::Char('2') => input_mode = InputMode::SetAlive,
-                event::KeyCode::Char('3') => input_mode = InputMode::SetDead,
+                event::KeyCode::Char('1') if prefabs.len() >= 1 => {
+                    prefab(&prefabs[0], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('2') if prefabs.len() >= 2 => {
+                    prefab(&prefabs[1], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('3') if prefabs.len() >= 3 => {
+                    prefab(&prefabs[2], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('4') if prefabs.len() >= 4 => {
+                    prefab(&prefabs[3], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('5') if prefabs.len() >= 5 => {
+                    prefab(&prefabs[4], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('6') if prefabs.len() >= 6 => {
+                    prefab(&prefabs[5], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('7') if prefabs.len() >= 7 => {
+                    prefab(&prefabs[6], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('8') if prefabs.len() >= 8 => {
+                    prefab(&prefabs[7], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('9') if prefabs.len() >= 9 => {
+                    prefab(&prefabs[8], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('0') if prefabs.len() >= 10 => {
+                    prefab(&prefabs[9], get_prefab_rotation(rx), life)
+                }
+                event::KeyCode::Char('q') => input_mode = InputMode::Toggle,
+                event::KeyCode::Char('w') => input_mode = InputMode::SetAlive,
+                event::KeyCode::Char('e') => input_mode = InputMode::SetDead,
                 event::KeyCode::Enter => break,
                 event::KeyCode::Esc => return true,
                 _ => {}
@@ -218,7 +265,10 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board
 
             match input_mode {
                 InputMode::SetAlive => {
-                    print_to_board(char_cells, life.set_cell(life.cursor_pos, life::Cell::Alive));
+                    print_to_board(
+                        char_cells,
+                        life.set_cell(life.cursor_pos, life::Cell::Alive),
+                    );
                 }
                 InputMode::SetDead => {
                     print_to_board(char_cells, life.set_cell(life.cursor_pos, life::Cell::Dead));
@@ -228,6 +278,7 @@ fn get_initial_board(life: &mut Life, rx: &mpsc::Receiver<event::KeyCode>, board
         }
     }
 
+    life.initial_cursor_pos = Some(cursor::position().unwrap());
     stdout().execute(cursor::Hide).unwrap();
     false
 }
@@ -239,23 +290,34 @@ fn reprint_board(life: &Life) {
     cursor_move(2, 1);
 }
 
-fn prefab(prefab: &dyn prefabs::Prefabable, life: &mut Life) -> bool{
-    if let Err(e) = life.place_prefab(prefab) {
-        use prefab::PrefabPlaceError;
-        match e {
-            PrefabPlaceError::InvalidCellPos(pos) => {
-                eprintln!("Invalid cell pos in prefab '{}': ({}, {})", stringify!(prefabs::r_pent), pos.0, pos.1);
-                return true;
+fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> prefab::Rotation {
+    loop {
+        if let Ok(code) = rx.recv() {
+            match code {
+                event::KeyCode::Up => return prefab::Rotation::Up,
+                event::KeyCode::Down => return prefab::Rotation::Down,
+                event::KeyCode::Left => return prefab::Rotation::Left,
+                event::KeyCode::Right => return prefab::Rotation::Right,
+                event::KeyCode::Char('w') => return prefab::Rotation::UpFlipped,
+                event::KeyCode::Char('s') => return prefab::Rotation::DownFlipped,
+                event::KeyCode::Char('a') => return prefab::Rotation::LeftFlipped,
+                event::KeyCode::Char('d') => return prefab::Rotation::RightFlipped,
+                _ => continue,
             }
-            _ => {}
+        }
+    }
+}
+
+fn prefab(prefab: &life::Board, rot: prefab::Rotation, life: &mut Life) {
+    if let Err(e) = life.place_prefab(prefab, rot) {
+        match e {
+            _ => {} // No errors need to be handled any way other than silently as of now
         }
     } else {
         let (x, y) = cursor::position().unwrap();
         reprint_board(life);
         cursor_move(x, y);
     }
-
-    false
 }
 
 fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {

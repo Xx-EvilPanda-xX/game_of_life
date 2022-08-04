@@ -16,14 +16,15 @@ arg 6: delay in miliseconds after tick has finished (note: that will not necassa
 arg 7 (optional): name of saved board to load 
 
 When in inital board selection:
-- 1 to switch to toggle mode
-- 2 to switch to set alive mode
-- 3 to switch to set dead mode
+- q to switch to toggle mode
+- w to switch to set alive mode
+- e to switch to set dead mode
 - s to save current initial state to file
 - space to toggle selected cell when in toggle mode
 - arrow keys to move around the field
 - esc to quit
 - enter to start the simulation
+- 0-9 to place prefab (then arrow keys for orientation)
 
 During simulation:
 - r to stop simulation and reset to previous initial state
@@ -33,5 +34,10 @@ During simulation:
 
 When saving a board out to a file, the name given will have the suffix ".life" appended to it
 and then be saved to "{WORKING_DIR}/saves/". if "{WORKING_DIR}/saves/" does not exsist, it will be created.
+
+Prefabs are saved in the same format as any other board save but are just stored in
+"{WORKING_DIR}/prefabs/". Upon start up, all valid prefabs in the prefab directory are loaded
+and assigned to the 0-9 keys in order according to their last modified times. Since prefabs are 
+an optional feature, the prefab directory will not be created automatically.
 
 Note: performance is heavily affected by waiting for stdout on a single thread, therefore limiting the tick speed to the speed at which things can be printed. As such, the tick delay that you provide will actually be slightly less than the actual time it takes for a tick, depending on the size of the board.

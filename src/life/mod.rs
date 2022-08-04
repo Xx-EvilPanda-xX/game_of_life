@@ -1,10 +1,9 @@
-use std::fmt::Display;
 use savefile_derive::*;
-
-pub mod prefabs;
+use std::fmt::Display;
 
 pub struct Life {
     pub cursor_pos: Pos,
+    pub initial_cursor_pos: Option<(u16, u16)>,
     pub dead_cell: char,
     pub alive_cell: char,
     pub board: Board,
@@ -13,16 +12,40 @@ pub struct Life {
 }
 
 pub mod prefab {
-    pub struct Prefab<const SIZE: usize> {
-        pub width: usize,
-        pub height: usize,
-        pub cells: [super::Pos; SIZE]
-    }
-    
+    use std::path;
+
     pub enum PrefabPlaceError {
         OutOfBounds(bool, bool),
-        InvalidCellPos(super::Pos),
-        CellOverlap
+        CellOverlap,
+    }
+
+    pub enum Rotation {
+        Up,
+        Down,
+        Left,
+        Right,
+        UpFlipped,
+        DownFlipped,
+        LeftFlipped,
+        RightFlipped,
+    }
+
+    pub fn load_prefabs() -> Vec<super::Board> {
+        if !path::Path::new("./prefabs/").exists() {
+            return Vec::new();
+        };
+
+        let mut prefabs = Vec::new();
+
+        for prefab in std::fs::read_dir("./prefabs/").unwrap() {
+            let prefab = prefab.unwrap();
+            prefabs.push(match savefile::load_file(prefab.path(), 0) {
+                Ok(p) => p,
+                Err(_) => continue,
+            });
+        }
+
+        prefabs
     }
 }
 
@@ -44,12 +67,12 @@ impl PartialEq for Cell {
         match self {
             Cell::Dead => match other {
                 Cell::Dead => true,
-                Cell::Alive => false
-            }
+                Cell::Alive => false,
+            },
             Cell::Alive => match other {
                 Cell::Dead => false,
-                Cell::Alive => true
-            }
+                Cell::Alive => true,
+            },
         }
     }
 }
@@ -68,7 +91,13 @@ impl Copy for Cell {}
 pub type Pos = (usize, usize);
 
 impl Life {
-    pub fn new(board_dims: (usize, usize), dead_cell: char, alive_cell: char, is_rand: bool, board: Option<Board>) -> Self {
+    pub fn new(
+        board_dims: (usize, usize),
+        dead_cell: char,
+        alive_cell: char,
+        is_rand: bool,
+        board: Option<Board>,
+    ) -> Self {
         let (w, h) = board_dims;
 
         Life {
@@ -84,12 +113,13 @@ impl Life {
             inital_state: Board {
                 width: w,
                 height: h,
-                cells: Life::init_board(Cell::Dead, w * h, false)
+                cells: Life::init_board(Cell::Dead, w * h, false),
             },
             dead_cell,
             alive_cell,
             dead: false,
             cursor_pos: (0, 0),
+            initial_cursor_pos: None
         }
     }
 
@@ -108,24 +138,21 @@ impl Life {
     pub fn reset(&mut self) {
         self.load_inital();
         self.dead = false;
-        self.cursor_pos = (0, 0);
     }
 
     fn init_board(cell: Cell, size: usize, random: bool) -> Vec<Cell> {
         let mut cells = Vec::with_capacity(size);
 
         for _ in 0..size {
-            cells.push(
-                if random {
-                    if rand::random() {
-                        Cell::Alive
-                    } else {
-                        Cell::Dead
-                    }
+            cells.push(if random {
+                if rand::random() {
+                    Cell::Alive
                 } else {
-                    cell
+                    Cell::Dead
                 }
-            );
+            } else {
+                cell
+            });
         }
 
         cells
@@ -134,21 +161,18 @@ impl Life {
     pub fn toggle_cell(&mut self, pos: Pos) -> Result<Cell, ()> {
         self.set_cell(
             pos,
-            match Life::at_pos(pos, &self.board) {
+            match Life::get_board_cell(pos, &self.board).unwrap_or_else(|| Cell::Dead) {
                 Cell::Dead => Cell::Alive,
                 Cell::Alive => Cell::Dead,
-            }
+            },
         )
     }
 
     pub fn set_cell(&mut self, pos: Pos, cell: Cell) -> Result<Cell, ()> {
-        let index = pos.1 * self.board.width + pos.0;
-        if index >= self.board.cells.len() {
-            return Err(());
+        match Life::set_board_cell(pos, cell, &mut self.board) {
+            Some(cell) => Ok(cell),
+            None => Err(()),
         }
-
-        self.board.cells[index] = cell;
-        Ok(self.board.cells[index])
     }
 
     pub fn tick(&mut self) {
@@ -169,7 +193,8 @@ impl Life {
             return;
         }
 
-        let mut new_board = Life::init_board(Cell::Dead, self.board.width * self.board.height, false);
+        let mut new_board =
+            Life::init_board(Cell::Dead, self.board.width * self.board.height, false);
 
         for (i, cell) in self.board.cells.iter().enumerate() {
             let alive = Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
@@ -218,30 +243,33 @@ impl Life {
         // }).count()
 
         // fast but boring
+
+        let at_pos = |x, y| Life::get_board_cell((x, y), board).unwrap_or_else(|| Cell::Dead);
+
         let mut neighbors = [Cell::Dead; 8];
         if pos.0 < board.width - 1 && pos.1 < board.height - 1 {
-            neighbors[0] = Life::at_pos((pos.0 + 1, pos.1 + 1), board);
+            neighbors[0] = at_pos(pos.0 + 1, pos.1 + 1);
         }
         if pos.1 < board.height - 1 {
-            neighbors[1] = Life::at_pos((pos.0, pos.1 + 1), board);
+            neighbors[1] = at_pos(pos.0, pos.1 + 1);
         }
         if pos.0 > 0 {
-            neighbors[2] = Life::at_pos((pos.0 - 1, pos.1 + 1), board);
+            neighbors[2] = at_pos(pos.0 - 1, pos.1 + 1);
         }
         if pos.0 < board.width - 1 {
-            neighbors[3] = Life::at_pos((pos.0 + 1, pos.1), board);
+            neighbors[3] = at_pos(pos.0 + 1, pos.1);
         }
         if pos.0 > 0 {
-            neighbors[4] = Life::at_pos((pos.0 - 1, pos.1), board);
+            neighbors[4] = at_pos(pos.0 - 1, pos.1);
         }
         if pos.0 < board.width - 1 && pos.1 > 0 {
-            neighbors[5] = Life::at_pos((pos.0 + 1, pos.1 - 1), board);
+            neighbors[5] = at_pos(pos.0 + 1, pos.1 - 1);
         }
         if pos.1 > 0 {
-            neighbors[6] = Life::at_pos((pos.0, pos.1 - 1), board);
+            neighbors[6] = at_pos(pos.0, pos.1 - 1);
         }
         if pos.0 > 0 && pos.1 > 0 {
-            neighbors[7] = Life::at_pos((pos.0 - 1, pos.1 - 1), board);
+            neighbors[7] = at_pos(pos.0 - 1, pos.1 - 1);
         }
 
         let mut count = 0;
@@ -255,41 +283,98 @@ impl Life {
         count
     }
 
-    fn at_pos(pos: Pos, board: &Board) -> Cell {
+    fn get_board_cell(pos: Pos, board: &Board) -> Option<Cell> {
         if pos.1 * board.width + pos.0 >= board.cells.len() {
-            return Cell::Dead;
+            return None;
         }
 
-        board.cells[pos.1 * board.width + pos.0]
+        Some(board.cells[pos.1 * board.width + pos.0])
     }
 
-    pub fn place_prefab(&mut self, prefab: &dyn prefabs::Prefabable) -> Result<(), prefab::PrefabPlaceError> {
-        use prefab::PrefabPlaceError;
-        
-        let check_x = self.cursor_pos.0 + prefab.width() >= self.board.width + 1;
-        let check_y = self.cursor_pos.1 + prefab.height() >= self.board.height + 1;
+    fn set_board_cell(pos: Pos, cell: Cell, board: &mut Board) -> Option<Cell> {
+        if pos.1 * board.width + pos.0 >= board.cells.len() {
+            return None;
+        }
+
+        board.cells[pos.1 * board.width + pos.0] = cell;
+        Some(board.cells[pos.1 * board.width + pos.0])
+    }
+
+    pub fn place_prefab(
+        &mut self,
+        prefab: &Board,
+        rot: prefab::Rotation,
+    ) -> Result<(), prefab::PrefabPlaceError> {
+        use prefab::{PrefabPlaceError, Rotation};
+
+        let (width, height) = match rot {
+            Rotation::Up | Rotation::Down | Rotation::UpFlipped | Rotation::DownFlipped => {
+                (prefab.height, prefab.width)
+            }
+            Rotation::Right | Rotation::Left | Rotation::RightFlipped | Rotation::LeftFlipped => {
+                (prefab.width, prefab.height)
+            }
+        };
+
+        let check_x = self.cursor_pos.0 + width >= self.board.width + 1;
+        let check_y = self.cursor_pos.1 + height >= self.board.height + 1;
 
         if check_x || check_y {
             return Err(PrefabPlaceError::OutOfBounds(check_x, check_y));
         }
 
-        for x in self.cursor_pos.0..self.cursor_pos.0 + prefab.width() {
-            for y in self.cursor_pos.1..self.cursor_pos.1 + prefab.height() {
-                if Life::at_pos((x, y), &self.board) == Cell::Alive {
+        for x in self.cursor_pos.0..self.cursor_pos.0 + width {
+            for y in self.cursor_pos.1..self.cursor_pos.1 + height {
+                if Life::get_board_cell((x, y), &self.board).unwrap_or_else(|| Cell::Dead)
+                    == Cell::Alive
+                {
                     return Err(PrefabPlaceError::CellOverlap);
                 }
             }
         }
 
-        for pos in prefab.cells().iter() {
-            if pos.0 >= prefab.width() || pos.1 >= prefab.height() {
-                return Err(PrefabPlaceError::InvalidCellPos((pos.0, pos.1)));
-            }
-
-            self.set_cell((self.cursor_pos.0 + pos.0, self.cursor_pos.1 + pos.1), Cell::Alive).unwrap();
+        for pos in Life::rotate_prefab(prefab, rot) {
+            self.set_cell(
+                (self.cursor_pos.0 + pos.0, self.cursor_pos.1 + pos.1),
+                Cell::Alive,
+            )
+            .unwrap();
         }
 
         Ok(())
+    }
+
+    fn rotate_prefab(prefab: &Board, rot: prefab::Rotation) -> Vec<Pos> {
+        let board = Board {
+            width: prefab.width,
+            height: prefab.height,
+            cells: prefab.cells.clone(),
+        };
+
+        let mut rotated_prefab = Vec::new();
+
+        for x in 0..board.width {
+            for y in 0..board.height {
+                let coords = match rot {
+                    prefab::Rotation::Up => (board.height - 1 - y, board.width - 1 - x),
+                    prefab::Rotation::Down => (y, x),
+                    prefab::Rotation::Left => (board.width - 1 - x, board.height - 1 - y),
+                    prefab::Rotation::Right => (x, y), // All prefabs must face right by default
+                    prefab::Rotation::UpFlipped => (y, board.width - 1 - x),
+                    prefab::Rotation::DownFlipped => (board.height - 1 - y, x),
+                    prefab::Rotation::LeftFlipped => (board.width - 1 - x, y),
+                    prefab::Rotation::RightFlipped => (x, board.height - 1 - y),
+                };
+
+                if let Cell::Alive =
+                    Life::get_board_cell((x, y), &board).unwrap_or_else(|| Cell::Dead)
+                {
+                    rotated_prefab.push(coords);
+                }
+            }
+        }
+
+        rotated_prefab
     }
 
     pub fn dims(&self) -> (usize, usize) {
@@ -302,9 +387,9 @@ impl Life {
 }
 
 impl Display for Life {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {        
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut output = String::new();
-        
+
         // top row of `-`
         for _ in 0..self.board.width {
             output.push_str(" -");
