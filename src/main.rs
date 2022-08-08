@@ -15,7 +15,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 7 && args.len() != 8 {
-        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis] OPTIONAL: [save_file]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`')\nSet the width and height to 0 for fullscreen", args[0]);
+        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis] OPTIONAL: [save_file]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`', 't' => '@')\nSet the width and height to 0 for fullscreen", args[0]);
         std::process::exit(-1);
     }
 
@@ -51,7 +51,7 @@ fn main() {
     }
 
     let (board_width, board_height) = if board_width == 0 && board_height == 0 {
-        (term_size.0 / 2 - 2, term_size.1 - 3)
+        (term_size.0 / 2 - 1, term_size.1 - 3)
     } else {
         (board_width, board_height)
     };
@@ -63,12 +63,14 @@ fn main() {
             '_' => ' ',
             'h' => '#',
             'a' => '`',
+            't' => '@',
             c => c,
         },
         match args[4].parse().expect("Failed to parse alive cell char") {
             '_' => ' ',
             'h' => '#',
             'a' => '`',
+            't' => '@',            
             c => c,
         },
         args[5].parse().expect("Failed to parse is_rand"),
@@ -165,13 +167,13 @@ fn get_initial_board(
 ) -> bool {
     // print setup board
     reprint_board(life);
-    stdout().execute(cursor::Show).unwrap();
     if let Some((x, y)) = life.initial_cursor_pos {
         cursor_move(x, y);
     }
 
     let mut input_mode = InputMode::Toggle;
 
+    print_cursor();
     loop {
         if let Ok(code) = rx.recv() {
             let char_cells = (life.dead_cell, life.alive_cell);
@@ -179,26 +181,34 @@ fn get_initial_board(
             match code {
                 event::KeyCode::Up => {
                     if life.cursor_pos.1 > 0 {
+                        remove_cursor();
                         stdout().execute(cursor::MoveUp(1)).unwrap();
                         life.cursor_pos.1 -= 1;
+                        print_cursor();
                     }
                 }
                 event::KeyCode::Down => {
                     if life.cursor_pos.1 < life.dims().1 - 1 {
+                        remove_cursor();
                         stdout().execute(cursor::MoveDown(1)).unwrap();
                         life.cursor_pos.1 += 1;
+                        print_cursor();
                     }
                 }
                 event::KeyCode::Left => {
                     if life.cursor_pos.0 > 0 {
+                        remove_cursor();
                         stdout().execute(cursor::MoveLeft(2)).unwrap();
                         life.cursor_pos.0 -= 1;
+                        print_cursor();
                     }
                 }
                 event::KeyCode::Right => {
                     if life.cursor_pos.0 < life.dims().0 - 1 {
+                        remove_cursor();
                         stdout().execute(cursor::MoveRight(2)).unwrap();
                         life.cursor_pos.0 += 1;
+                        print_cursor();
                     }
                 }
                 event::KeyCode::Char(' ') => {
@@ -279,7 +289,6 @@ fn get_initial_board(
     }
 
     life.initial_cursor_pos = Some(cursor::position().unwrap());
-    stdout().execute(cursor::Hide).unwrap();
     false
 }
 
@@ -288,6 +297,23 @@ fn reprint_board(life: &Life) {
     cursor_move(0, 0);
     print!("{}", life);
     cursor_move(2, 1);
+}
+
+fn print_cursor() {
+    print_around_cursor('[', ']');
+}
+
+fn remove_cursor() {
+    print_around_cursor(' ', ' ');
+}
+
+fn print_around_cursor(c1: char, c2: char) {
+    stdout().execute(cursor::MoveLeft(1)).unwrap();
+    print!("{}", c1);
+    stdout().execute(cursor::MoveRight(1)).unwrap();
+    print!("{}", c2);
+    stdout().execute(cursor::MoveLeft(2)).unwrap();
+    stdout().flush().unwrap();
 }
 
 fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> prefab::Rotation {
@@ -311,12 +337,13 @@ fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> prefab::Rotation 
 fn prefab(prefab: &life::Board, rot: prefab::Rotation, life: &mut Life) {
     if let Err(e) = life.place_prefab(prefab, rot) {
         match e {
-            _ => {} // No errors need to be handled any way other than silently as of now
+            _ => {} // No errors need to be handled in any way other than silently as of now
         }
     } else {
         let (x, y) = cursor::position().unwrap();
         reprint_board(life);
         cursor_move(x, y);
+        print_cursor();
     }
 }
 

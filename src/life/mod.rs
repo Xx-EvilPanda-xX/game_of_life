@@ -253,7 +253,7 @@ impl Life {
         if pos.1 < board.height - 1 {
             neighbors[1] = at_pos(pos.0, pos.1 + 1);
         }
-        if pos.0 > 0 {
+        if pos.0 > 0 && pos.1 < board.height - 1 {
             neighbors[2] = at_pos(pos.0 - 1, pos.1 + 1);
         }
         if pos.0 < board.width - 1 {
@@ -325,8 +325,7 @@ impl Life {
 
         for x in self.cursor_pos.0..self.cursor_pos.0 + width {
             for y in self.cursor_pos.1..self.cursor_pos.1 + height {
-                if Life::get_board_cell((x, y), &self.board).unwrap_or_else(|| Cell::Dead)
-                    == Cell::Alive
+                if Life::get_board_cell((x, y), &self.board).unwrap_or_else(|| Cell::Dead) == Cell::Alive
                 {
                     return Err(PrefabPlaceError::CellOverlap);
                 }
@@ -366,8 +365,7 @@ impl Life {
                     prefab::Rotation::RightFlipped => (x, board.height - 1 - y),
                 };
 
-                if let Cell::Alive =
-                    Life::get_board_cell((x, y), &board).unwrap_or_else(|| Cell::Dead)
+                if let Cell::Alive = Life::get_board_cell((x, y), &board).unwrap_or_else(|| Cell::Dead)
                 {
                     rotated_prefab.push(coords);
                 }
