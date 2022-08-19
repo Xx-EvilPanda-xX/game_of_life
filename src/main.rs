@@ -51,7 +51,7 @@ fn main() {
     }
 
     let (board_width, board_height) = if board_width == 0 && board_height == 0 {
-        (term_size.0 / 2 - 1, term_size.1 - 3)
+        (term_size.0 / 2 - (2 - term_size.0 % 2), term_size.1 - 3)
     } else {
         (board_width, board_height)
     };
@@ -235,7 +235,7 @@ fn get_initial_board(
                     reprint_board(life);
                     life.cursor_pos = (0, 0);
                 }
-                event::KeyCode::Char('1') if prefabs.len() >= 1 => {
+                event::KeyCode::Char('1') if !prefabs.is_empty() => {
                     prefab(&prefabs[0], get_prefab_rotation(rx), life)
                 }
                 event::KeyCode::Char('2') if prefabs.len() >= 2 => {
