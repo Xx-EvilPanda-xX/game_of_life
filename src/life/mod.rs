@@ -1,5 +1,8 @@
-use savefile_derive::*;
 use std::fmt::Display;
+use crate::dyn_array::DynArray;
+
+pub mod loader;
+pub mod saver;
 
 pub struct Life {
     pub cursor_pos: Pos,
@@ -11,8 +14,12 @@ pub struct Life {
     dead: bool,
 }
 
+pub type Board = DynArray<Cell, 2>;
+
 pub mod prefab {
     use std::path;
+
+    use super::loader;
 
     pub enum PrefabPlaceError {
         OutOfBounds(bool, bool),
@@ -39,7 +46,7 @@ pub mod prefab {
 
         for prefab in std::fs::read_dir("./prefabs/").unwrap() {
             let prefab = prefab.unwrap();
-            prefabs.push(match savefile::load_file(prefab.path(), 0) {
+            prefabs.push(match loader::load(prefab.path().as_path().to_str().unwrap()) {
                 Ok(p) => p,
                 Err(_) => continue,
             });
@@ -49,14 +56,6 @@ pub mod prefab {
     }
 }
 
-#[derive(Savefile)]
-pub struct Board {
-    pub width: usize,
-    pub height: usize,
-    cells: Vec<Cell>,
-}
-
-#[derive(Savefile)]
 pub enum Cell {
     Dead,
     Alive,
@@ -104,17 +103,9 @@ impl Life {
             board: if let Some(board) = board {
                 board
             } else {
-                Board {
-                    width: w,
-                    height: h,
-                    cells: Life::init_board(Cell::Dead, w * h, is_rand),
-                }
+                Life::init_board(Cell::Dead, [w, h], is_rand)
             },
-            inital_state: Board {
-                width: w,
-                height: h,
-                cells: Life::init_board(Cell::Dead, w * h, false),
-            },
+            inital_state: Life::init_board(Cell::Dead, [w, h], false),
             dead_cell,
             alive_cell,
             dead: false,
@@ -124,14 +115,14 @@ impl Life {
     }
 
     pub fn save_state(&mut self) {
-        for (i, cell) in self.board.cells.iter().enumerate() {
-            self.inital_state.cells[i] = *cell;
+        for (i, cell) in &self.board {
+            self.inital_state[i] = *cell;
         }
     }
 
     pub fn load_inital(&mut self) {
-        for (i, cell) in self.inital_state.cells.iter().enumerate() {
-            self.board.cells[i] = *cell;
+        for (i, cell) in &self.inital_state {
+            self.board[i] = *cell;
         }
     }
 
@@ -140,19 +131,21 @@ impl Life {
         self.dead = false;
     }
 
-    fn init_board(cell: Cell, size: usize, random: bool) -> Vec<Cell> {
-        let mut cells = Vec::with_capacity(size);
+    fn init_board(cell: Cell, dims: [usize; 2], random: bool) -> Board {
+        let mut cells = Board::new(dims, cell);
 
-        for _ in 0..size {
-            cells.push(if random {
-                if rand::random() {
-                    Cell::Alive
+        for x in 0..cells.width() {
+            for y in 0..cells.height() {
+                cells[[x, y]] = if random {
+                    if rand::random() {
+                        Cell::Alive
+                    } else {
+                        Cell::Dead
+                    }
                 } else {
-                    Cell::Dead
-                }
-            } else {
-                cell
-            });
+                    cell
+                };
+            }
         }
 
         cells
@@ -183,9 +176,8 @@ impl Life {
 
         if self
             .board
-            .cells
-            .iter()
-            .filter(|cell| **cell == Cell::Alive)
+            .into_iter()
+            .filter(|&(_, cell)| *cell == Cell::Alive)
             .count()
             == 0
         {
@@ -194,10 +186,10 @@ impl Life {
         }
 
         let mut new_board =
-            Life::init_board(Cell::Dead, self.board.width * self.board.height, false);
+            Life::init_board(Cell::Dead, [self.board.width(), self.board.height()], false);
 
-        for (i, cell) in self.board.cells.iter().enumerate() {
-            let alive = Life::alive_neighbors((i % self.board.width, i / self.board.width), &self.board);
+        for (i, cell) in &self.board {
+            let alive = Life::alive_neighbors((i[0], i[1]), &self.board);
 
             new_board[i] = match cell {
                 Cell::Dead => {
@@ -217,7 +209,7 @@ impl Life {
             }
         }
 
-        self.board.cells = new_board;
+        self.board = new_board;
     }
 
     fn alive_neighbors(pos: Pos, board: &Board) -> usize {
@@ -247,22 +239,22 @@ impl Life {
         let at_pos = |x, y| Life::get_board_cell((x, y), board).unwrap_or(Cell::Dead);
 
         let mut neighbors = [Cell::Dead; 8];
-        if pos.0 < board.width - 1 && pos.1 < board.height - 1 {
+        if pos.0 < board.width() - 1 && pos.1 < board.height() - 1 {
             neighbors[0] = at_pos(pos.0 + 1, pos.1 + 1);
         }
-        if pos.1 < board.height - 1 {
+        if pos.1 < board.height() - 1 {
             neighbors[1] = at_pos(pos.0, pos.1 + 1);
         }
-        if pos.0 > 0 && pos.1 < board.height - 1 {
+        if pos.0 > 0 && pos.1 < board.height() - 1 {
             neighbors[2] = at_pos(pos.0 - 1, pos.1 + 1);
         }
-        if pos.0 < board.width - 1 {
+        if pos.0 < board.width() - 1 {
             neighbors[3] = at_pos(pos.0 + 1, pos.1);
         }
         if pos.0 > 0 {
             neighbors[4] = at_pos(pos.0 - 1, pos.1);
         }
-        if pos.0 < board.width - 1 && pos.1 > 0 {
+        if pos.0 < board.width() - 1 && pos.1 > 0 {
             neighbors[5] = at_pos(pos.0 + 1, pos.1 - 1);
         }
         if pos.1 > 0 {
@@ -284,20 +276,20 @@ impl Life {
     }
 
     fn get_board_cell(pos: Pos, board: &Board) -> Option<Cell> {
-        if pos.1 * board.width + pos.0 >= board.cells.len() {
+        if pos.0 >= board.width() || pos.1 >= board.height() {
             return None;
         }
 
-        Some(board.cells[pos.1 * board.width + pos.0])
+        Some(board[[pos.0, pos.1]])
     }
 
     fn set_board_cell(pos: Pos, cell: Cell, board: &mut Board) -> Option<Cell> {
-        if pos.1 * board.width + pos.0 >= board.cells.len() {
+        if pos.0 >= board.width() || pos.1 >= board.height() {
             return None;
         }
 
-        board.cells[pos.1 * board.width + pos.0] = cell;
-        Some(board.cells[pos.1 * board.width + pos.0])
+        board[[pos.0, pos.1]] = cell;
+        Some(board[[pos.0, pos.1]])
     }
 
     pub fn place_prefab(
@@ -309,15 +301,15 @@ impl Life {
 
         let (width, height) = match rot {
             Rotation::Up | Rotation::Down | Rotation::UpFlipped | Rotation::DownFlipped => {
-                (prefab.height, prefab.width)
+                (prefab.height(), prefab.width())
             }
             Rotation::Right | Rotation::Left | Rotation::RightFlipped | Rotation::LeftFlipped => {
-                (prefab.width, prefab.height)
+                (prefab.width(), prefab.height())
             }
         };
 
-        let check_x = self.cursor_pos.0 + width >= self.board.width + 1;
-        let check_y = self.cursor_pos.1 + height >= self.board.height + 1;
+        let check_x = self.cursor_pos.0 + width >= self.board.width() + 1;
+        let check_y = self.cursor_pos.1 + height >= self.board.height() + 1;
 
         if check_x || check_y {
             return Err(PrefabPlaceError::OutOfBounds(check_x, check_y));
@@ -346,21 +338,20 @@ impl Life {
     fn rotate_prefab(prefab: &Board, rot: prefab::Rotation) -> Vec<Pos> {
         let mut rotated_prefab = Vec::new();
 
-        for x in 0..prefab.width {
-            for y in 0..prefab.height {
+        for x in 0..prefab.width() {
+            for y in 0..prefab.height() {
                 let coords = match rot {
-                    prefab::Rotation::Up => (y, prefab.width - 1 - x),
-                    prefab::Rotation::Down => (prefab.height - 1 - y, x),
-                    prefab::Rotation::Left => (prefab.width - 1 - x, prefab.height - 1 - y),
+                    prefab::Rotation::Up => (y, prefab.width() - 1 - x),
+                    prefab::Rotation::Down => (prefab.height() - 1 - y, x),
+                    prefab::Rotation::Left => (prefab.width() - 1 - x, prefab.height() - 1 - y),
                     prefab::Rotation::Right => (x, y), // All prefabs must face right by default
-                    prefab::Rotation::UpFlipped => (prefab.height - 1 - y, prefab.width - 1 - x),
+                    prefab::Rotation::UpFlipped => (prefab.height() - 1 - y, prefab.width() - 1 - x),
                     prefab::Rotation::DownFlipped => (y, x),
-                    prefab::Rotation::LeftFlipped => (prefab.width - 1 - x, y),
-                    prefab::Rotation::RightFlipped => (x, prefab.height - 1 - y),
+                    prefab::Rotation::LeftFlipped => (prefab.width() - 1 - x, y),
+                    prefab::Rotation::RightFlipped => (x, prefab.height() - 1 - y),
                 };
 
-                if let Cell::Alive = Life::get_board_cell((x, y), &prefab).unwrap_or(Cell::Dead)
-                {
+                if let Cell::Alive = Life::get_board_cell((x, y), &prefab).unwrap_or(Cell::Dead) {
                     rotated_prefab.push(coords);
                 }
             }
@@ -370,7 +361,7 @@ impl Life {
     }
 
     pub fn dims(&self) -> (usize, usize) {
-        (self.board.width, self.board.height)
+        (self.board.width(), self.board.height())
     }
 
     pub fn is_dead(&self) -> bool {
@@ -383,14 +374,14 @@ impl Display for Life {
         let mut output = String::new();
 
         // top row of `-`
-        for _ in 0..self.board.width {
+        for _ in 0..self.board.width() {
             output.push_str(" -");
         }
         output.push_str(" -\n\r|");
 
         // cells and side `|`
-        for (i, cell) in self.board.cells.iter().enumerate() {
-            if i % self.board.width == 0 && i != 0 {
+        for (i, cell) in self.board.data().iter().enumerate() {
+            if i % self.board.width() == 0 && i != 0 {
                 output.push_str(" |\n\r|");
             }
 
@@ -402,7 +393,7 @@ impl Display for Life {
 
         // bottom row of `-`
         output.push_str(" |\n\r");
-        for _ in 0..self.board.width {
+        for _ in 0..self.board.width() {
             output.push_str(" -");
         }
         output.push_str(" -");

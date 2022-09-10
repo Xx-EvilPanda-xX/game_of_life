@@ -10,6 +10,7 @@ use std::sync::mpsc;
 use std::thread;
 
 mod life;
+mod dyn_array;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -22,7 +23,7 @@ fn main() {
     let (board_width, board_height, board) = if args.len() == 8 {
         let board = get_saved_board(Path::new(args[7].as_str()));
         if let Some(b) = board.as_ref() {
-            (b.width, b.height, board)
+            (b.width(), b.height(), board)
         } else {
             eprintln!("Error: the specified board save could not be loaded. Please make sure it exsits before trying again.");
             std::process::exit(-1);
@@ -147,7 +148,7 @@ fn get_saved_board(path: &Path) -> Option<life::Board> {
         return None;
     }
 
-    match savefile::load_file(path_buf, 0) {
+    match life::loader::load(path_buf.as_path().to_str().unwrap()) {
         Ok(board) => Some(board),
         Err(_) => None,
     }
@@ -225,7 +226,7 @@ fn get_initial_board(
                     terminal::disable_raw_mode().unwrap();
                     let path = get_save_path();
 
-                    if let Err(e) = savefile::save_file(path.clone(), 0, &life.board) {
+                    if let Err(e) = life::saver::save(path.as_path().to_str().unwrap(), &life.board) {
                         eprintln!("Error: failed to save board to: {}: {}", path.display(), e);
                         thread::sleep(std::time::Duration::from_millis(5000));
                     }
@@ -366,7 +367,9 @@ fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
 fn get_save_path() -> PathBuf {
     println!("Please enter a name for the board to be saved as:");
     let mut input = String::new();
+    stdout().execute(cursor::Show).unwrap();
     std::io::stdin().read_line(&mut input).unwrap();
+    stdout().execute(cursor::Hide).unwrap();
     let mut path = PathBuf::new();
     path.push("./saves/");
     path.push(input.trim().to_string() + ".life");
