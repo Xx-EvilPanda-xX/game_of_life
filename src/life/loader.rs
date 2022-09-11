@@ -4,8 +4,16 @@ use std::mem::size_of;
 pub fn load(path: &str) -> Result<Board, std::io::Error> {
     let bytes = std::fs::read(path)?;
     let dims = from_bytes(&bytes[0..size_of::<[usize; 2]>()]);
-    let data = from_bytes(&bytes[size_of::<[usize; 2]>()..]);
-    Ok(Board::new_from_data([dims[0], dims[1]], Vec::from(data)))
+
+    let mut data_bytes = Vec::new();
+    for byte in &bytes[size_of::<[usize; 2]>()..] {
+        for bit in 0..8 {
+            data_bytes.push((byte >> bit) & 1);
+        }
+    }
+
+    let data = from_bytes(&data_bytes);
+    Ok(Board::new_from_data([dims[0], dims[1]], Vec::from(&data[0..(dims[0] * dims[1])])))
 }
 
 fn from_bytes<T: Copy>(x: &[u8]) -> &[T] {
@@ -23,6 +31,6 @@ fn test_load() {
             super::Cell::Dead => '_',
         });
     }
-    
+
     println!();
 }

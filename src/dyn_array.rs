@@ -35,6 +35,10 @@ impl<T: Clone, const D: usize> DynArray<T, D> {
     }
 
     pub fn new_from_data(dims: [usize; D], data: Vec<T>) -> Self {
+        if data.len() != dims.iter().product() {
+            panic!("Vec len not equal to dimensions");
+        }
+
         Self {
             dims,
             data,

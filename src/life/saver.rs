@@ -1,17 +1,30 @@
 use super::Board;
 
 pub fn save(path: &str, board: &Board) -> Result<(), std::io::Error> {
-    let mut bytes = Vec::new();
+    let mut out = Vec::new();
 
     for byte in as_bytes(board.dims()) {
-        bytes.push(*byte);
+        out.push(*byte);
     }
 
-    for byte in as_bytes(board.data()) {
-        bytes.push(*byte);
-    }
+    let data = as_bytes(board.data());
+    let mut packed = 0;
+    let mut bit = 0;
 
-    std::fs::write(path, bytes)
+    for byte in data {
+        assert!(*byte == 1 || *byte == 0);
+        packed |= byte << bit;
+        bit += 1;
+
+        if bit == 8 {
+            out.push(packed);
+            packed = 0;
+            bit = 0;
+        }
+    }
+    out.push(packed);
+
+    std::fs::write(path, out)
 }
 
 fn as_bytes<T: Copy>(x: &[T]) -> &[u8] {
