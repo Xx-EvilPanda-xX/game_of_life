@@ -27,8 +27,8 @@ pub fn save(path: &str, board: &Board) -> Result<(), std::io::Error> {
     std::fs::write(path, out)
 }
 
-fn as_bytes<T: Copy>(x: &[T]) -> &[u8] {
-    unsafe{ std::slice::from_raw_parts(x.as_ptr() as *const u8, std::mem::size_of::<T>() * x.len()) }
+fn as_bytes<T>(x: &[T]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(x.as_ptr() as *const u8, std::mem::size_of::<T>() * x.len()) }
 }
 
 #[test]

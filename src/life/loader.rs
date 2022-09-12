@@ -16,9 +16,9 @@ pub fn load(path: &str) -> Result<Board, std::io::Error> {
     Ok(Board::new_from_data([dims[0], dims[1]], Vec::from(&data[0..(dims[0] * dims[1])])))
 }
 
-fn from_bytes<T: Copy>(x: &[u8]) -> &[T] {
+fn from_bytes<T>(x: &[u8]) -> &[T] {
     assert_eq!(x.len() % size_of::<T>(), 0);
-    unsafe{ std::slice::from_raw_parts(x.as_ptr() as *const T, x.len() / size_of::<T>()) }
+    unsafe { std::slice::from_raw_parts(x.as_ptr() as *const T, x.len() / size_of::<T>()) }
 }
 
 #[test]

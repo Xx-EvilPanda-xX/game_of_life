@@ -124,6 +124,10 @@ fn main() {
                     event::KeyCode::Esc => break 'outer,
                     _ => {}
                 }
+
+                if tick_delay == 0 {
+                    tick_delay = 1;
+                }
             }
         }
 
@@ -144,7 +148,7 @@ fn get_saved_board(path: &Path) -> Option<life::Board> {
     path_buf.push("./saves/");
     path_buf.push(path.to_str().unwrap().to_string() + ".life");
 
-    if !path_buf.clone().into_boxed_path().as_ref().exists() {
+    if !path_buf.as_path().exists() {
         return None;
     }
 

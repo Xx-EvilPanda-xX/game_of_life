@@ -62,6 +62,10 @@ impl<T, const D: usize> DynArray<T, D> {
     pub fn data(&self) -> &[T] {
         &self.data
     }
+
+    pub fn data_mut(&mut self) -> &mut [T] {
+        &mut self.data
+    }
 }
 
 impl<T, const D: usize> Index<[usize; D]> for DynArray<T, D> {
@@ -95,8 +99,8 @@ fn get_index(dims: &[usize], index: &[usize]) -> usize {
 fn check_index(dims: &[usize], index: &[usize]) -> bool {
     assert_eq!(dims.len(), index.len());
 
-    for (i, dim) in index.iter().enumerate() {
-        if *dim >= dims[i] {
+    for (i, dim) in index.iter().zip(dims) {
+        if i >= dim {
             return false;
         }
     }

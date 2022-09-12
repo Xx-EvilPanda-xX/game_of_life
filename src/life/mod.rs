@@ -131,20 +131,16 @@ impl Life {
         self.dead = false;
     }
 
-    fn init_board(cell: Cell, dims: [usize; 2], random: bool) -> Board {
-        let mut cells = Board::new(dims, cell);
+    fn init_board(init_cell: Cell, dims: [usize; 2], random: bool) -> Board {
+        let mut cells = Board::new(dims, init_cell);
 
-        for x in 0..cells.width() {
-            for y in 0..cells.height() {
-                cells[[x, y]] = if random {
-                    if rand::random() {
-                        Cell::Alive
-                    } else {
-                        Cell::Dead
-                    }
+        if random {
+            for cell in cells.data_mut() {
+                *cell = if rand::random() {
+                    Cell::Alive
                 } else {
-                    cell
-                };
+                    Cell::Dead
+                }
             }
         }
 
@@ -338,22 +334,20 @@ impl Life {
     fn rotate_prefab(prefab: &Board, rot: prefab::Rotation) -> Vec<Pos> {
         let mut rotated_prefab = Vec::new();
 
-        for x in 0..prefab.width() {
-            for y in 0..prefab.height() {
-                let coords = match rot {
-                    prefab::Rotation::Up => (y, prefab.width() - 1 - x),
-                    prefab::Rotation::Down => (prefab.height() - 1 - y, x),
-                    prefab::Rotation::Left => (prefab.width() - 1 - x, prefab.height() - 1 - y),
-                    prefab::Rotation::Right => (x, y), // All prefabs must face right by default
-                    prefab::Rotation::UpFlipped => (prefab.height() - 1 - y, prefab.width() - 1 - x),
-                    prefab::Rotation::DownFlipped => (y, x),
-                    prefab::Rotation::LeftFlipped => (prefab.width() - 1 - x, y),
-                    prefab::Rotation::RightFlipped => (x, prefab.height() - 1 - y),
-                };
+        for ([x, y], cell) in prefab {
+            let coords = match rot {
+                prefab::Rotation::Up => (y, prefab.width() - 1 - x),
+                prefab::Rotation::Down => (prefab.height() - 1 - y, x),
+                prefab::Rotation::Left => (prefab.width() - 1 - x, prefab.height() - 1 - y),
+                prefab::Rotation::Right => (x, y), // All prefabs must face right by default
+                prefab::Rotation::UpFlipped => (prefab.height() - 1 - y, prefab.width() - 1 - x),
+                prefab::Rotation::DownFlipped => (y, x),
+                prefab::Rotation::LeftFlipped => (prefab.width() - 1 - x, y),
+                prefab::Rotation::RightFlipped => (x, prefab.height() - 1 - y),
+            };
 
-                if let Cell::Alive = Life::get_board_cell((x, y), &prefab).unwrap_or(Cell::Dead) {
-                    rotated_prefab.push(coords);
-                }
+            if let Cell::Alive = cell {
+                rotated_prefab.push(coords);
             }
         }
 
