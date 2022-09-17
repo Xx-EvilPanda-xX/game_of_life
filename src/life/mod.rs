@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use crate::dyn_array::DynArray;
+use dyn_array::DynArray;
 
 pub mod loader;
 pub mod saver;

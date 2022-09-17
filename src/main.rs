@@ -10,7 +10,6 @@ use std::sync::mpsc;
 use std::thread;
 
 mod life;
-mod dyn_array;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

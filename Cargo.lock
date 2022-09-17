@@ -46,10 +46,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dyn_array"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c93e4984363ad368490be6abb3374b4ac3e9fe792935eea8d6c47343edc16cfa"
+
+[[package]]
 name = "game_of_life"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "dyn_array",
  "rand",
 ]
 

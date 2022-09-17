@@ -33,7 +33,7 @@ fn as_bytes<T>(x: &[T]) -> &[u8] {
 
 #[test]
 fn test_save() {
-    let mut board = crate::dyn_array::DynArray::new([5, 5], super::Cell::Dead);
+    let mut board = dyn_array::DynArray::new([5, 5], super::Cell::Dead);
     board[[0, 0]] = super::Cell::Alive;
     board[[1, 1]] = super::Cell::Alive;
     save("test1.dat", &board).unwrap();
