@@ -21,6 +21,7 @@ pub mod prefab {
 
     use super::loader;
 
+    #[derive(Copy, Clone, Debug)]
     pub enum PrefabPlaceError {
         OutOfBounds(bool, bool),
         CellOverlap,
@@ -87,7 +88,11 @@ impl Clone for Cell {
 
 impl Copy for Cell {}
 
-pub type Pos = (usize, usize);
+#[derive(Clone, Copy, Debug)]
+pub struct Pos {
+    pub x: usize,
+    pub y: usize,
+}
 
 impl Life {
     pub fn new(
@@ -109,7 +114,7 @@ impl Life {
             dead_cell,
             alive_cell,
             dead: false,
-            cursor_pos: (0, 0),
+            cursor_pos: Pos { x: 0, y: 0 },
             initial_cursor_pos: None
         }
     }
@@ -164,6 +169,23 @@ impl Life {
         }
     }
 
+    pub fn fill_rect(&mut self, ul: Pos, lr: Pos, cell: Cell) -> bool {
+        if ul.x >= self.board.width() || ul.y >= self.board.height()
+            || lr.x >= self.board.width() || lr.y >= self.board.height()
+            || lr.x <= ul.x || lr.y <= ul.y
+        {
+            return false;
+        }
+
+        for x in ul.x..lr.x {
+            for y in ul.y..lr.y {
+                Life::set_board_cell(Pos { x, y }, cell, &mut self.board);
+            }
+        }
+
+        true
+    }
+
     pub fn tick(&mut self) {
         if self.dead {
             println!("Board is dead!\n");
@@ -185,7 +207,7 @@ impl Life {
             Life::init_board(Cell::Dead, [self.board.width(), self.board.height()], false);
 
         for (i, cell) in &self.board {
-            let alive = Life::alive_neighbors((i[0], i[1]), &self.board);
+            let alive = Life::alive_neighbors(Pos { x: i[0], y: i[1] }, &self.board);
 
             new_board[i] = match cell {
                 Cell::Dead => {
@@ -214,8 +236,8 @@ impl Life {
         // board.cells.iter().enumerate().filter(|(i, _)| {
         //     let x1 = (i % board.width) as isize;
         //     let y1 = (i / board.width) as isize;
-        //     let x2 = pos.0 as isize;
-        //     let y2 = pos.1 as isize;
+        //     let x2 = pos.x as isize;
+        //     let y2 = pos.y as isize;
 
         //     if x1 == x2 && y1 == y2 {
         //         return false;
@@ -232,32 +254,32 @@ impl Life {
 
         // fast but boring
 
-        let at_pos = |x, y| Life::get_board_cell((x, y), board).unwrap_or(Cell::Dead);
+        let at_pos = |x, y| Life::get_board_cell(Pos { x, y }, board).unwrap_or(Cell::Dead);
 
         let mut neighbors = [Cell::Dead; 8];
-        if pos.0 < board.width() - 1 && pos.1 < board.height() - 1 {
-            neighbors[0] = at_pos(pos.0 + 1, pos.1 + 1);
+        if pos.x < board.width() - 1 && pos.y < board.height() - 1 {
+            neighbors[0] = at_pos(pos.x + 1, pos.y + 1);
         }
-        if pos.1 < board.height() - 1 {
-            neighbors[1] = at_pos(pos.0, pos.1 + 1);
+        if pos.y < board.height() - 1 {
+            neighbors[1] = at_pos(pos.x, pos.y + 1);
         }
-        if pos.0 > 0 && pos.1 < board.height() - 1 {
-            neighbors[2] = at_pos(pos.0 - 1, pos.1 + 1);
+        if pos.x > 0 && pos.y < board.height() - 1 {
+            neighbors[2] = at_pos(pos.x - 1, pos.y + 1);
         }
-        if pos.0 < board.width() - 1 {
-            neighbors[3] = at_pos(pos.0 + 1, pos.1);
+        if pos.x < board.width() - 1 {
+            neighbors[3] = at_pos(pos.x + 1, pos.y);
         }
-        if pos.0 > 0 {
-            neighbors[4] = at_pos(pos.0 - 1, pos.1);
+        if pos.x > 0 {
+            neighbors[4] = at_pos(pos.x - 1, pos.y);
         }
-        if pos.0 < board.width() - 1 && pos.1 > 0 {
-            neighbors[5] = at_pos(pos.0 + 1, pos.1 - 1);
+        if pos.x < board.width() - 1 && pos.y > 0 {
+            neighbors[5] = at_pos(pos.x + 1, pos.y - 1);
         }
-        if pos.1 > 0 {
-            neighbors[6] = at_pos(pos.0, pos.1 - 1);
+        if pos.y > 0 {
+            neighbors[6] = at_pos(pos.x, pos.y - 1);
         }
-        if pos.0 > 0 && pos.1 > 0 {
-            neighbors[7] = at_pos(pos.0 - 1, pos.1 - 1);
+        if pos.x > 0 && pos.y > 0 {
+            neighbors[7] = at_pos(pos.x - 1, pos.y - 1);
         }
 
         let mut count = 0;
@@ -272,20 +294,20 @@ impl Life {
     }
 
     fn get_board_cell(pos: Pos, board: &Board) -> Option<Cell> {
-        if pos.0 >= board.width() || pos.1 >= board.height() {
+        if pos.x >= board.width() || pos.y >= board.height() {
             return None;
         }
 
-        Some(board[[pos.0, pos.1]])
+        Some(board[[pos.x, pos.y]])
     }
 
     fn set_board_cell(pos: Pos, cell: Cell, board: &mut Board) -> Option<Cell> {
-        if pos.0 >= board.width() || pos.1 >= board.height() {
+        if pos.x >= board.width() || pos.y >= board.height() {
             return None;
         }
 
-        board[[pos.0, pos.1]] = cell;
-        Some(board[[pos.0, pos.1]])
+        board[[pos.x, pos.y]] = cell;
+        Some(board[[pos.x, pos.y]])
     }
 
     pub fn place_prefab(
@@ -304,16 +326,16 @@ impl Life {
             }
         };
 
-        let check_x = self.cursor_pos.0 + width >= self.board.width() + 1;
-        let check_y = self.cursor_pos.1 + height >= self.board.height() + 1;
+        let check_x = self.cursor_pos.x + width >= self.board.width() + 1;
+        let check_y = self.cursor_pos.y + height >= self.board.height() + 1;
 
         if check_x || check_y {
             return Err(PrefabPlaceError::OutOfBounds(check_x, check_y));
         }
 
-        for x in self.cursor_pos.0..self.cursor_pos.0 + width {
-            for y in self.cursor_pos.1..self.cursor_pos.1 + height {
-                if Life::get_board_cell((x, y), &self.board).unwrap_or(Cell::Dead) == Cell::Alive
+        for x in self.cursor_pos.x..self.cursor_pos.x + width {
+            for y in self.cursor_pos.y..self.cursor_pos.y + height {
+                if Life::get_board_cell(Pos { x, y }, &self.board).unwrap_or(Cell::Dead) == Cell::Alive
                 {
                     return Err(PrefabPlaceError::CellOverlap);
                 }
@@ -322,7 +344,7 @@ impl Life {
 
         for pos in Life::rotate_prefab(prefab, rot) {
             self.set_cell(
-                (self.cursor_pos.0 + pos.0, self.cursor_pos.1 + pos.1),
+                Pos { x: self.cursor_pos.x + pos.x, y: self.cursor_pos.y + pos.y },
                 Cell::Alive,
             )
             .unwrap();
@@ -332,18 +354,18 @@ impl Life {
     }
 
     fn rotate_prefab(prefab: &Board, rot: prefab::Rotation) -> Vec<Pos> {
-        let mut rotated_prefab = Vec::new();
+        let mut rotated_prefab = Vec::with_capacity(prefab.width() * prefab.height());
 
         for ([x, y], cell) in prefab {
             let coords = match rot {
-                prefab::Rotation::Up => (y, prefab.width() - 1 - x),
-                prefab::Rotation::Down => (prefab.height() - 1 - y, x),
-                prefab::Rotation::Left => (prefab.width() - 1 - x, prefab.height() - 1 - y),
-                prefab::Rotation::Right => (x, y), // All prefabs must face right by default
-                prefab::Rotation::UpFlipped => (prefab.height() - 1 - y, prefab.width() - 1 - x),
-                prefab::Rotation::DownFlipped => (y, x),
-                prefab::Rotation::LeftFlipped => (prefab.width() - 1 - x, y),
-                prefab::Rotation::RightFlipped => (x, prefab.height() - 1 - y),
+                prefab::Rotation::Up => Pos { x: y, y: prefab.width() - 1 - x },
+                prefab::Rotation::Down => Pos { x: prefab.height() - 1 - y, y: x },
+                prefab::Rotation::Left => Pos { x: prefab.width() - 1 - x, y: prefab.height() - 1 - y },
+                prefab::Rotation::Right => Pos { x, y }, // All prefabs must face right by default
+                prefab::Rotation::UpFlipped => Pos { x: prefab.height() - 1 - y, y: prefab.width() - 1 - x },
+                prefab::Rotation::DownFlipped => Pos { x: y, y: x },
+                prefab::Rotation::LeftFlipped => Pos { x: prefab.width() - 1 - x, y: y },
+                prefab::Rotation::RightFlipped => Pos { x: x, y: prefab.height() - 1 - y },
             };
 
             if let Cell::Alive = cell {

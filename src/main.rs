@@ -2,10 +2,12 @@ use crossterm::{cursor, event, terminal, ExecutableCommand};
 use life::prefab;
 use life::Cell;
 use life::Life;
+use life::Pos;
 use std::env;
 use std::io::stdout;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::thread;
 
@@ -176,6 +178,20 @@ fn get_initial_board(
     }
 
     let mut input_mode = InputMode::Toggle;
+    let mut status_msg = String::new();
+
+    let mut status = |s| {
+        if let Some(msg) = s {
+            status_msg = msg;
+        }
+
+        let (prev_x, prev_y) = cursor::position().unwrap();
+        cursor_move(0, (board_height + 2) as u16);
+        stdout().execute(terminal::Clear(terminal::ClearType::CurrentLine)).unwrap();
+        print!("{}", status_msg);
+        stdout().flush().unwrap();
+        cursor_move(prev_x, prev_y);
+    };
 
     print_cursor();
     loop {
@@ -184,34 +200,34 @@ fn get_initial_board(
 
             match code {
                 event::KeyCode::Up => {
-                    if life.cursor_pos.1 > 0 {
+                    if life.cursor_pos.y > 0 {
                         remove_cursor();
                         stdout().execute(cursor::MoveUp(1)).unwrap();
-                        life.cursor_pos.1 -= 1;
+                        life.cursor_pos.y -= 1;
                         print_cursor();
                     }
                 }
                 event::KeyCode::Down => {
-                    if life.cursor_pos.1 < life.dims().1 - 1 {
+                    if life.cursor_pos.y < life.dims().1 - 1 {
                         remove_cursor();
                         stdout().execute(cursor::MoveDown(1)).unwrap();
-                        life.cursor_pos.1 += 1;
+                        life.cursor_pos.y += 1;
                         print_cursor();
                     }
                 }
                 event::KeyCode::Left => {
-                    if life.cursor_pos.0 > 0 {
+                    if life.cursor_pos.x > 0 {
                         remove_cursor();
                         stdout().execute(cursor::MoveLeft(2)).unwrap();
-                        life.cursor_pos.0 -= 1;
+                        life.cursor_pos.x -= 1;
                         print_cursor();
                     }
                 }
                 event::KeyCode::Right => {
-                    if life.cursor_pos.0 < life.dims().0 - 1 {
+                    if life.cursor_pos.x < life.dims().0 - 1 {
                         remove_cursor();
                         stdout().execute(cursor::MoveRight(2)).unwrap();
-                        life.cursor_pos.0 += 1;
+                        life.cursor_pos.x += 1;
                         print_cursor();
                     }
                 }
@@ -225,53 +241,82 @@ fn get_initial_board(
                         std::fs::create_dir("saves").unwrap();
                     }
 
-                    cursor_move(0, (board_height + 2) as u16);
-                    terminal::disable_raw_mode().unwrap();
-                    let path = get_save_path();
+                    let prev_cursor_pos = cursor::position().unwrap();
+                    let input: String = get_cmd_input("Please enter a name for the board to be saved as:", board_height).unwrap();
+                    let mut path = PathBuf::new();
+                    path.push("./saves/");
+                    path.push(input + ".life");
 
                     if let Err(e) = life::saver::save(path.as_path().to_str().unwrap(), &life.board) {
-                        eprintln!("Error: failed to save board to: {}: {}", path.display(), e);
-                        thread::sleep(std::time::Duration::from_millis(5000));
+                        status(Some(format!("Error: failed to save board to: {}: {}", path.display(), e)));
                     }
 
-                    terminal::enable_raw_mode().unwrap();
-
-                    reprint_board(life);
-                    life.cursor_pos = (0, 0);
+                    print_board_and_restore_cursor(life, Some(prev_cursor_pos), &mut status);
                 }
-                event::KeyCode::Char('1') if !prefabs.is_empty() => {
-                    prefab(&prefabs[0], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('1') => {
+                    if !prefabs.is_empty() {
+                        prefab(&prefabs[0], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 1 doesn't exist."))) }
                 }
-                event::KeyCode::Char('2') if prefabs.len() >= 2 => {
-                    prefab(&prefabs[1], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('2') => {
+                    if prefabs.len() >= 2 {
+                        prefab(&prefabs[1], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 2 doesn't exist."))) }
                 }
-                event::KeyCode::Char('3') if prefabs.len() >= 3 => {
-                    prefab(&prefabs[2], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('3') => {
+                    if prefabs.len() >= 3 {
+                        prefab(&prefabs[2], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 3 doesn't exist."))) }
                 }
-                event::KeyCode::Char('4') if prefabs.len() >= 4 => {
-                    prefab(&prefabs[3], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('4') => {
+                    if prefabs.len() >= 4 {
+                        prefab(&prefabs[3], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 4 doesn't exist."))) }
                 }
-                event::KeyCode::Char('5') if prefabs.len() >= 5 => {
-                    prefab(&prefabs[4], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('5') => {
+                    if prefabs.len() >= 5 {
+                        prefab(&prefabs[4], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 5 doesn't exist."))) }
                 }
-                event::KeyCode::Char('6') if prefabs.len() >= 6 => {
-                    prefab(&prefabs[5], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('6') => {
+                    if prefabs.len() >= 6 {
+                        prefab(&prefabs[5], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 6 doesn't exist."))) }
                 }
-                event::KeyCode::Char('7') if prefabs.len() >= 7 => {
-                    prefab(&prefabs[6], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('7') => {
+                    if prefabs.len() >= 7 {
+                        prefab(&prefabs[6], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 7 doesn't exist."))) }
                 }
-                event::KeyCode::Char('8') if prefabs.len() >= 8 => {
-                    prefab(&prefabs[7], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('8') => {
+                    if prefabs.len() >= 8 {
+                        prefab(&prefabs[7], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 8 doesn't exist."))) }
                 }
-                event::KeyCode::Char('9') if prefabs.len() >= 9 => {
-                    prefab(&prefabs[8], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('9') => {
+                    if prefabs.len() >= 9 {
+                        prefab(&prefabs[8], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 9 doesn't exist."))) }
                 }
-                event::KeyCode::Char('0') if prefabs.len() >= 10 => {
-                    prefab(&prefabs[9], get_prefab_rotation(rx), life)
+                event::KeyCode::Char('0') => {
+                    if prefabs.len() >= 10 {
+                        prefab(&prefabs[9], get_prefab_rotation(rx), life, &mut status)
+                    } else { status(Some(String::from("Prefab 0 doesn't exist."))) }
                 }
-                event::KeyCode::Char('q') => input_mode = InputMode::Toggle,
-                event::KeyCode::Char('w') => input_mode = InputMode::SetAlive,
-                event::KeyCode::Char('e') => input_mode = InputMode::SetDead,
+                event::KeyCode::Char('q') => {
+                    input_mode = InputMode::Toggle;
+                    status(Some(String::from("Input mode: Toggle")));
+                }
+                event::KeyCode::Char('w') => {
+                    input_mode = InputMode::SetAlive;
+                    status(Some(String::from("Input mode: SetAlive")));
+                }
+                event::KeyCode::Char('e') => {
+                    input_mode = InputMode::SetDead;
+                    status(Some(String::from("Input mode: SetDead")));
+                }
+                event::KeyCode::Char('c') => fill_board(life, Cell::Dead, board_height, &mut status),
+                event::KeyCode::Char('f') => fill_board(life, Cell::Alive, board_height, &mut status),
                 event::KeyCode::Enter => break,
                 event::KeyCode::Esc => return true,
                 _ => {}
@@ -294,6 +339,33 @@ fn get_initial_board(
 
     life.initial_cursor_pos = Some(cursor::position().unwrap());
     false
+}
+
+fn fill_board(life: &mut Life, cell: Cell, board_height: usize, status: &mut impl FnMut(Option<String>)) {
+    let get_dim = |s| {
+        let mut x = get_cmd_input(s, board_height);
+        while let Err(_) = x {
+            print_to_cmd("Failed to parse. Please try again.");
+            x = get_cmd_input(s, board_height);
+        }
+        x.unwrap()
+    };
+
+    let prev_cursor_pos = cursor::position().unwrap();
+    let lr_offset = Pos {
+        x: get_dim("width:"),
+        y: get_dim("height:"),
+    };
+
+    if !life.fill_rect(
+        life.cursor_pos, 
+        Pos { x: life.cursor_pos.x + lr_offset.x, y: life.cursor_pos.y + lr_offset.y }, 
+        cell)
+    {
+        status(Some(String::from("Invalid selection")));
+    }
+
+    print_board_and_restore_cursor(life, Some(prev_cursor_pos), status);
 }
 
 fn reprint_board(life: &Life) {
@@ -338,17 +410,22 @@ fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> prefab::Rotation 
     }
 }
 
-fn prefab(prefab: &life::Board, rot: prefab::Rotation, life: &mut Life) {
+fn prefab(prefab: &life::Board, rot: prefab::Rotation, life: &mut Life, status: &mut impl FnMut(Option<String>)) {
     if let Err(e) = life.place_prefab(prefab, rot) {
         match e {
-            _ => {} // No errors need to be handled in any way other than silently as of now
+            _ => status(Some(format!("Failed to place prefab: {:?}", e))) // No errors need to be handled in any way other than silently as of now
         }
     } else {
-        let (x, y) = cursor::position().unwrap();
-        reprint_board(life);
-        cursor_move(x, y);
-        print_cursor();
+        print_board_and_restore_cursor(life, None, status);
     }
+}
+
+fn print_board_and_restore_cursor(life: &Life, prev_cursor: Option<(u16, u16)>, status: &mut impl FnMut(Option<String>)) {
+    let (x, y) = prev_cursor.unwrap_or(cursor::position().unwrap());
+    reprint_board(life);
+    cursor_move(x, y);
+    print_cursor();
+    status(None);
 }
 
 fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
@@ -367,16 +444,24 @@ fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
     stdout().execute(cursor::MoveLeft(1)).unwrap();
 }
 
-fn get_save_path() -> PathBuf {
-    println!("Please enter a name for the board to be saved as:");
+fn get_cmd_input<T>(prompt: &str, board_height: usize) -> Result<T, <T as FromStr>::Err>
+    where T: FromStr
+{
+    cursor_move(0, (board_height + 2) as u16);
+    terminal::disable_raw_mode().unwrap();
+    println!("{}", prompt);
     let mut input = String::new();
     stdout().execute(cursor::Show).unwrap();
     std::io::stdin().read_line(&mut input).unwrap();
     stdout().execute(cursor::Hide).unwrap();
-    let mut path = PathBuf::new();
-    path.push("./saves/");
-    path.push(input.trim().to_string() + ".life");
-    path
+    terminal::enable_raw_mode().unwrap();
+    input.trim().parse()
+}
+
+fn print_to_cmd(s: &str) {
+    terminal::disable_raw_mode().unwrap();
+    println!("{}", s);
+    terminal::enable_raw_mode().unwrap();
 }
 
 fn clear() {
