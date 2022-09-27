@@ -110,10 +110,11 @@ fn run_life() {
             break;
         }
         life.save_state();
+        clear();
 
         while !life.is_dead() {
             life.tick();
-            clear();
+            purge();
             cursor_move(0, 0);
             print!("{}", life);
             stdout().flush().unwrap();
@@ -259,16 +260,16 @@ fn get_initial_board(
 
                     print_board_and_restore_cursor(life, Some(prev_cursor_pos), &mut status);
                 }
-                event::KeyCode::Char('1') => prefab(&prefabs, 0, life, &mut status, rx),
-                event::KeyCode::Char('2') => prefab(&prefabs, 1, life, &mut status, rx),
-                event::KeyCode::Char('3') => prefab(&prefabs, 2, life, &mut status, rx),
-                event::KeyCode::Char('4') => prefab(&prefabs, 3, life, &mut status, rx),
-                event::KeyCode::Char('5') => prefab(&prefabs, 4, life, &mut status, rx),
-                event::KeyCode::Char('6') => prefab(&prefabs, 5, life, &mut status, rx),
-                event::KeyCode::Char('7') => prefab(&prefabs, 6, life, &mut status, rx),
-                event::KeyCode::Char('8') => prefab(&prefabs, 7, life, &mut status, rx),
-                event::KeyCode::Char('9') => prefab(&prefabs, 8, life, &mut status, rx),
-                event::KeyCode::Char('0') => prefab(&prefabs, 9, life, &mut status, rx),
+                event::KeyCode::Char('2') => prefab(prefabs, 1, life, &mut status, rx),
+                event::KeyCode::Char('3') => prefab(prefabs, 2, life, &mut status, rx),
+                event::KeyCode::Char('1') => prefab(prefabs, 0, life, &mut status, rx),
+                event::KeyCode::Char('4') => prefab(prefabs, 3, life, &mut status, rx),
+                event::KeyCode::Char('5') => prefab(prefabs, 4, life, &mut status, rx),
+                event::KeyCode::Char('6') => prefab(prefabs, 5, life, &mut status, rx),
+                event::KeyCode::Char('7') => prefab(prefabs, 6, life, &mut status, rx),
+                event::KeyCode::Char('8') => prefab(prefabs, 7, life, &mut status, rx),
+                event::KeyCode::Char('9') => prefab(prefabs, 8, life, &mut status, rx),
+                event::KeyCode::Char('0') => prefab(prefabs, 9, life, &mut status, rx),
                 event::KeyCode::Char('q') => {
                     input_mode = InputMode::Toggle;
                     status(Some(String::from("Input mode: Toggle")));
@@ -310,7 +311,7 @@ fn get_initial_board(
 fn fill_board_rect(life: &mut Life, cell: Cell, board_height: usize, status: &mut impl FnMut(Option<String>)) {
     let get_dim = |s| {
         let mut x = get_cmd_input(s, board_height);
-        while let Err(_) = x {
+        while x.is_err() {
             print_to_cmd("Failed to parse. Please try again.");
             x = get_cmd_input(s, board_height);
         }
@@ -454,6 +455,12 @@ fn print_to_cmd(s: &str) {
 fn clear() {
     stdout()
         .execute(terminal::Clear(terminal::ClearType::All))
+        .unwrap();
+}
+
+fn purge() {
+    stdout()
+        .execute(terminal::Clear(terminal::ClearType::Purge))
         .unwrap();
 }
 

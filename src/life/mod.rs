@@ -382,8 +382,8 @@ impl Life {
                 prefab::Rotation::Right => Pos { x, y }, // All prefabs must face right by default
                 prefab::Rotation::UpFlipped => Pos { x: prefab.height() - 1 - y, y: prefab.width() - 1 - x },
                 prefab::Rotation::DownFlipped => Pos { x: y, y: x },
-                prefab::Rotation::LeftFlipped => Pos { x: prefab.width() - 1 - x, y: y },
-                prefab::Rotation::RightFlipped => Pos { x: x, y: prefab.height() - 1 - y },
+                prefab::Rotation::LeftFlipped => Pos { x: prefab.width() - 1 - x, y },
+                prefab::Rotation::RightFlipped => Pos { x, y: prefab.height() - 1 - y },
             };
 
             if let Cell::Alive = cell {
