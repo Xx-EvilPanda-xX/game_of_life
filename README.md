@@ -19,6 +19,8 @@ When in inital board selection:
 - q to switch to toggle mode
 - w to switch to set alive mode
 - e to switch to set dead mode
+- c to set a given rectangle of cells to dead
+- f to set a given rectangle of cells to alive
 - s to save current initial state to file
 - space to toggle selected cell when in toggle mode
 - arrow keys to move around the field

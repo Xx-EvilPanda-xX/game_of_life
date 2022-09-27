@@ -21,6 +21,11 @@ pub mod prefab {
 
     use super::loader;
 
+    pub struct Prefab {
+        pub board: super::Board,
+        pub name: String,
+    }
+
     #[derive(Copy, Clone, Debug)]
     pub enum PrefabPlaceError {
         OutOfBounds(bool, bool),
@@ -38,7 +43,7 @@ pub mod prefab {
         RightFlipped,
     }
 
-    pub fn load_prefabs() -> Vec<super::Board> {
+    pub fn load_prefabs() -> Vec<Prefab> {
         if !path::Path::new("./prefabs/").exists() {
             return Vec::new();
         };
@@ -47,10 +52,23 @@ pub mod prefab {
 
         for prefab in std::fs::read_dir("./prefabs/").unwrap() {
             let prefab = prefab.unwrap();
-            prefabs.push(match loader::load(prefab.path().as_path().to_str().unwrap()) {
-                Ok(p) => p,
-                Err(_) => continue,
-            });
+            prefabs.push(
+                Prefab {
+                    board: match loader::load(prefab.path().as_path().to_str().unwrap()) {
+                        Ok(p) => p,
+                        Err(_) => continue,
+                    },
+                    name: prefab
+                        .path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .strip_suffix(".life")
+                        .unwrap()
+                        .to_string()
+                }
+            );
         }
 
         prefabs

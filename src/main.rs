@@ -1,5 +1,6 @@
 use crossterm::{cursor, event, terminal, ExecutableCommand};
 use life::prefab;
+use life::prefab::Prefab;
 use life::Cell;
 use life::Life;
 use life::Pos;
@@ -14,6 +15,10 @@ use std::thread;
 mod life;
 
 fn main() {
+    run_life();
+}
+
+fn run_life() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 7 && args.len() != 8 {
@@ -169,7 +174,7 @@ fn get_initial_board(
     life: &mut Life,
     rx: &mpsc::Receiver<event::KeyCode>,
     board_height: usize,
-    prefabs: &[life::Board],
+    prefabs: &[Prefab],
 ) -> bool {
     // print setup board
     reprint_board(life);
@@ -242,6 +247,7 @@ fn get_initial_board(
                     }
 
                     let prev_cursor_pos = cursor::position().unwrap();
+                    status(Some(String::new()));
                     let input: String = get_cmd_input("Please enter a name for the board to be saved as:", board_height).unwrap();
                     let mut path = PathBuf::new();
                     path.push("./saves/");
@@ -253,56 +259,16 @@ fn get_initial_board(
 
                     print_board_and_restore_cursor(life, Some(prev_cursor_pos), &mut status);
                 }
-                event::KeyCode::Char('1') => {
-                    if !prefabs.is_empty() {
-                        prefab(&prefabs[0], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 1 doesn't exist."))) }
-                }
-                event::KeyCode::Char('2') => {
-                    if prefabs.len() >= 2 {
-                        prefab(&prefabs[1], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 2 doesn't exist."))) }
-                }
-                event::KeyCode::Char('3') => {
-                    if prefabs.len() >= 3 {
-                        prefab(&prefabs[2], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 3 doesn't exist."))) }
-                }
-                event::KeyCode::Char('4') => {
-                    if prefabs.len() >= 4 {
-                        prefab(&prefabs[3], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 4 doesn't exist."))) }
-                }
-                event::KeyCode::Char('5') => {
-                    if prefabs.len() >= 5 {
-                        prefab(&prefabs[4], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 5 doesn't exist."))) }
-                }
-                event::KeyCode::Char('6') => {
-                    if prefabs.len() >= 6 {
-                        prefab(&prefabs[5], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 6 doesn't exist."))) }
-                }
-                event::KeyCode::Char('7') => {
-                    if prefabs.len() >= 7 {
-                        prefab(&prefabs[6], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 7 doesn't exist."))) }
-                }
-                event::KeyCode::Char('8') => {
-                    if prefabs.len() >= 8 {
-                        prefab(&prefabs[7], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 8 doesn't exist."))) }
-                }
-                event::KeyCode::Char('9') => {
-                    if prefabs.len() >= 9 {
-                        prefab(&prefabs[8], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 9 doesn't exist."))) }
-                }
-                event::KeyCode::Char('0') => {
-                    if prefabs.len() >= 10 {
-                        prefab(&prefabs[9], get_prefab_rotation(rx), life, &mut status)
-                    } else { status(Some(String::from("Prefab 0 doesn't exist."))) }
-                }
+                event::KeyCode::Char('1') => prefab(&prefabs, 0, life, &mut status, rx),
+                event::KeyCode::Char('2') => prefab(&prefabs, 1, life, &mut status, rx),
+                event::KeyCode::Char('3') => prefab(&prefabs, 2, life, &mut status, rx),
+                event::KeyCode::Char('4') => prefab(&prefabs, 3, life, &mut status, rx),
+                event::KeyCode::Char('5') => prefab(&prefabs, 4, life, &mut status, rx),
+                event::KeyCode::Char('6') => prefab(&prefabs, 5, life, &mut status, rx),
+                event::KeyCode::Char('7') => prefab(&prefabs, 6, life, &mut status, rx),
+                event::KeyCode::Char('8') => prefab(&prefabs, 7, life, &mut status, rx),
+                event::KeyCode::Char('9') => prefab(&prefabs, 8, life, &mut status, rx),
+                event::KeyCode::Char('0') => prefab(&prefabs, 9, life, &mut status, rx),
                 event::KeyCode::Char('q') => {
                     input_mode = InputMode::Toggle;
                     status(Some(String::from("Input mode: Toggle")));
@@ -315,8 +281,8 @@ fn get_initial_board(
                     input_mode = InputMode::SetDead;
                     status(Some(String::from("Input mode: SetDead")));
                 }
-                event::KeyCode::Char('c') => fill_board(life, Cell::Dead, board_height, &mut status),
-                event::KeyCode::Char('f') => fill_board(life, Cell::Alive, board_height, &mut status),
+                event::KeyCode::Char('c') => fill_board_rect(life, Cell::Dead, board_height, &mut status),
+                event::KeyCode::Char('f') => fill_board_rect(life, Cell::Alive, board_height, &mut status),
                 event::KeyCode::Enter => break,
                 event::KeyCode::Esc => return true,
                 _ => {}
@@ -341,7 +307,7 @@ fn get_initial_board(
     false
 }
 
-fn fill_board(life: &mut Life, cell: Cell, board_height: usize, status: &mut impl FnMut(Option<String>)) {
+fn fill_board_rect(life: &mut Life, cell: Cell, board_height: usize, status: &mut impl FnMut(Option<String>)) {
     let get_dim = |s| {
         let mut x = get_cmd_input(s, board_height);
         while let Err(_) = x {
@@ -352,6 +318,7 @@ fn fill_board(life: &mut Life, cell: Cell, board_height: usize, status: &mut imp
     };
 
     let prev_cursor_pos = cursor::position().unwrap();
+    status(Some(String::new()));
     let lr_offset = Pos {
         x: get_dim("width:"),
         y: get_dim("height:"),
@@ -392,31 +359,51 @@ fn print_around_cursor(c1: char, c2: char) {
     stdout().flush().unwrap();
 }
 
-fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> prefab::Rotation {
+fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> Option<prefab::Rotation> {
     loop {
         if let Ok(code) = rx.recv() {
             match code {
-                event::KeyCode::Up => return prefab::Rotation::Up,
-                event::KeyCode::Down => return prefab::Rotation::Down,
-                event::KeyCode::Left => return prefab::Rotation::Left,
-                event::KeyCode::Right => return prefab::Rotation::Right,
-                event::KeyCode::Char('w') => return prefab::Rotation::UpFlipped,
-                event::KeyCode::Char('s') => return prefab::Rotation::DownFlipped,
-                event::KeyCode::Char('a') => return prefab::Rotation::LeftFlipped,
-                event::KeyCode::Char('d') => return prefab::Rotation::RightFlipped,
+                event::KeyCode::Up => return Some(prefab::Rotation::Up),
+                event::KeyCode::Down => return Some(prefab::Rotation::Down),
+                event::KeyCode::Left => return Some(prefab::Rotation::Left),
+                event::KeyCode::Right => return Some(prefab::Rotation::Right),
+                event::KeyCode::Char('w') => return Some(prefab::Rotation::UpFlipped),
+                event::KeyCode::Char('s') => return Some(prefab::Rotation::DownFlipped),
+                event::KeyCode::Char('a') => return Some(prefab::Rotation::LeftFlipped),
+                event::KeyCode::Char('d') => return Some(prefab::Rotation::RightFlipped),
+                event::KeyCode::Esc => return None,
                 _ => continue,
             }
         }
     }
 }
 
-fn prefab(prefab: &life::Board, rot: prefab::Rotation, life: &mut Life, status: &mut impl FnMut(Option<String>)) {
-    if let Err(e) = life.place_prefab(prefab, rot) {
-        match e {
-            _ => status(Some(format!("Failed to place prefab: {:?}", e))) // No errors need to be handled in any way other than silently as of now
+fn prefab(
+    prefabs: &[Prefab],
+    index: usize,
+    life: &mut Life,
+    status: &mut impl FnMut(Option<String>),
+    rx: &mpsc::Receiver<event::KeyCode>
+) {
+    if index < prefabs.len() {
+        status(Some(format!("Placing prefab {}. Select an orientation. Press esc to cancel.", prefabs[index].name)));
+        if let Err(e) = life.place_prefab(
+            &prefabs[index].board,
+            if let Some(r) = get_prefab_rotation(rx) {
+                    r
+            } else {
+                status(Some(String::new()));
+                return;
+            }) {
+            match e {
+                _ => status(Some(format!("Failed to place prefab: {:?}", e)))
+            }
+        } else {
+            print_board_and_restore_cursor(life, None, status);
+            status(Some(String::new()));
         }
-    } else {
-        print_board_and_restore_cursor(life, None, status);
+    } else { 
+        status(Some(format!("Prefab {} doesn't exist.", index + 1)))
     }
 }
 
