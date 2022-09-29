@@ -21,13 +21,13 @@ fn main() {
 fn run_life() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 7 && args.len() != 8 {
-        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] [tick_delay_milis] OPTIONAL: [save_file]\nNOTE: (`_` => ' ', 'h' => '#', 'a' => '`', 't' => '@')\nSet the width and height to 0 for fullscreen", args[0]);
+    if !(args.len() == 6 || args.len() == 7) {
+        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] OPTIONAL: [save_file]\nNOTE: use these chars in place of ones that can't be used in cmd args (`_` => ' ', 'h' => '#', 'a' => '`', 't' => '@')\nSet the width and height to 0 for fullscreen", args[0]);
         std::process::exit(-1);
     }
 
-    let (board_width, board_height, board) = if args.len() == 8 {
-        let board = get_saved_board(Path::new(args[7].as_str()));
+    let (board_width, board_height, board) = if args.len() == 7 {
+        let board = get_saved_board(Path::new(args[6].as_str()));
         if let Some(b) = board.as_ref() {
             (b.width(), b.height(), board)
         } else {
@@ -63,7 +63,6 @@ fn run_life() {
         (board_width, board_height)
     };
 
-    let mut tick_delay = args[6].parse().expect("Failed to parse tick delay");
     let mut life = Life::new(
         (board_width, board_height),
         match args[3].parse().expect("Failed to parse dead cell char") {
@@ -77,7 +76,7 @@ fn run_life() {
             '_' => ' ',
             'h' => '#',
             'a' => '`',
-            't' => '@',            
+            't' => '@',
             c => c,
         },
         args[5].parse().expect("Failed to parse is_rand"),
@@ -104,6 +103,8 @@ fn run_life() {
         }
     });
 
+    let mut tick_delay = 64000;
+
     'outer: loop {
         if get_initial_board(&mut life, &key_rx, board_height, &prefabs) {
             cursor_move(0, (board_height + 2) as u16);
@@ -118,7 +119,7 @@ fn run_life() {
             cursor_move(0, 0);
             print!("{}", life);
             stdout().flush().unwrap();
-            std::thread::sleep(std::time::Duration::from_millis(tick_delay));
+            std::thread::sleep(std::time::Duration::from_micros(tick_delay));
 
             while let Ok(code) = key_rx.try_recv() {
                 match code {
@@ -126,15 +127,13 @@ fn run_life() {
                         life.reset();
                         continue 'outer;
                     }
-                    event::KeyCode::Up if tick_delay > 0 => tick_delay -= tick_delay / 10 + 1,
-                    event::KeyCode::Down if tick_delay < 1000 => tick_delay += tick_delay / 10 + 1,
+                    event::KeyCode::Up => tick_delay /= 2,
+                    event::KeyCode::Down => tick_delay *= 2,
                     event::KeyCode::Esc => break 'outer,
                     _ => {}
                 }
 
-                if tick_delay == 0 {
-                    tick_delay = 1;
-                }
+                tick_delay = tick_delay.clamp(1000, 1024000);
             }
         }
 
@@ -260,9 +259,9 @@ fn get_initial_board(
 
                     print_board_and_restore_cursor(life, Some(prev_cursor_pos), &mut status);
                 }
+                event::KeyCode::Char('1') => prefab(prefabs, 0, life, &mut status, rx),
                 event::KeyCode::Char('2') => prefab(prefabs, 1, life, &mut status, rx),
                 event::KeyCode::Char('3') => prefab(prefabs, 2, life, &mut status, rx),
-                event::KeyCode::Char('1') => prefab(prefabs, 0, life, &mut status, rx),
                 event::KeyCode::Char('4') => prefab(prefabs, 3, life, &mut status, rx),
                 event::KeyCode::Char('5') => prefab(prefabs, 4, life, &mut status, rx),
                 event::KeyCode::Char('6') => prefab(prefabs, 5, life, &mut status, rx),
@@ -285,7 +284,10 @@ fn get_initial_board(
                 event::KeyCode::Char('c') => fill_board_rect(life, Cell::Dead, board_height, &mut status),
                 event::KeyCode::Char('f') => fill_board_rect(life, Cell::Alive, board_height, &mut status),
                 event::KeyCode::Enter => break,
-                event::KeyCode::Esc => return true,
+                event::KeyCode::Esc => {
+                    status(Some(String::new()));
+                    return true;
+                }
                 _ => {}
             }
 
