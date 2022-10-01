@@ -1,6 +1,8 @@
 use super::Board;
+use std::mem::size_of;
 
 pub fn save(path: &str, board: &Board) -> Result<(), std::io::Error> {
+    assert_eq!(size_of::<super::Cell>(), 1);
     let mut out = Vec::new();
 
     for byte in as_bytes(board.dims()) {
@@ -28,7 +30,7 @@ pub fn save(path: &str, board: &Board) -> Result<(), std::io::Error> {
 }
 
 fn as_bytes<T>(x: &[T]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(x.as_ptr() as *const u8, std::mem::size_of::<T>() * x.len()) }
+    unsafe { std::slice::from_raw_parts(x.as_ptr() as *const u8, size_of::<T>() * x.len()) }
 }
 
 #[test]

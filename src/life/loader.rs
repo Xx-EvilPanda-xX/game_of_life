@@ -2,6 +2,7 @@ use super::Board;
 use std::mem::size_of;
 
 pub fn load(path: &str) -> Result<Board, std::io::Error> {
+    assert_eq!(size_of::<super::Cell>(), 1);
     let bytes = std::fs::read(path)?;
     let dims = from_bytes(&bytes[0..size_of::<[usize; 2]>()]);
 
