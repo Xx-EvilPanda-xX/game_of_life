@@ -13,6 +13,7 @@ use std::sync::mpsc;
 use std::thread;
 
 mod life;
+mod args;
 
 fn main() {
     run_life();
@@ -20,35 +21,14 @@ fn main() {
 
 fn run_life() {
     let args: Vec<String> = env::args().collect();
-
-    if !(args.len() == 6 || args.len() == 7) {
-        println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] OPTIONAL: [save_file]\nNOTE: use these chars in place of ones that can't be used in cmd args (`_` => ' ', 'h' => '#', 'a' => '`', 't' => '@')\nSet the width and height to 0 for fullscreen", args[0]);
-        std::process::exit(-1);
-    }
-
-    let (board_width, board_height, board) = if args.len() == 7 {
-        let board = get_saved_board(Path::new(args[6].as_str()));
-        if let Some(b) = board.as_ref() {
-            (b.width(), b.height(), board)
-        } else {
-            eprintln!("Error: the specified board save could not be loaded. Please make sure it exsits before trying again.");
-            std::process::exit(-1);
-        }
-    } else {
-        (
-            args[1].parse().expect("Failed to parse width"),
-            args[2].parse().expect("Failed to parse height"),
-            None,
-        )
-    };
-
+    let config = args::Config::new(&args);
     let term_size = (
         terminal::size().unwrap().0 as usize,
         terminal::size().unwrap().1 as usize,
     );
 
-    let check_x = (board_width + 1) * 2 > term_size.0;
-    let check_y = board_height + 3 > term_size.1;
+    let check_x = (config.board_width + 1) * 2 > term_size.0;
+    let check_y = config.board_height + 3 > term_size.1;
     if check_x || check_y {
         eprintln!(
             "Error: terminal not large enough for specified dimensions. x: {}, y: {}",
@@ -57,29 +37,31 @@ fn run_life() {
         std::process::exit(-1);
     }
 
-    let (board_width, board_height) = if board_width == 0 && board_height == 0 {
+    let (board_width, board_height) = if config.board_width == 0 && config.board_height == 0 {
         (term_size.0 / 2 - (2 - term_size.0 % 2), term_size.1 - 3)
     } else {
-        (board_width, board_height)
+        (config.board_width, config.board_height)
+    };
+
+    let mut board_save_status = None;
+    let board = match config.save_name {
+        Some(name) => {
+            match get_saved_board(Path::new(&name)) {
+                Ok(board) => Some(board),
+                Err(e) => {
+                    board_save_status = Some(e);
+                    None
+                }
+            }
+        }
+        None => None
     };
 
     let mut life = Life::new(
         (board_width, board_height),
-        match args[3].parse().expect("Failed to parse dead cell char") {
-            '_' => ' ',
-            'h' => '#',
-            'a' => '`',
-            't' => '@',
-            c => c,
-        },
-        match args[4].parse().expect("Failed to parse alive cell char") {
-            '_' => ' ',
-            'h' => '#',
-            'a' => '`',
-            't' => '@',
-            c => c,
-        },
-        args[5].parse().expect("Failed to parse is_rand"),
+        config.dead_cell,
+        config.alive_cell,
+        config.is_rand,
         board,
     );
 
@@ -106,7 +88,7 @@ fn run_life() {
     let mut tick_delay = 64000;
 
     'outer: loop {
-        if get_initial_board(&mut life, &key_rx, board_height, &prefabs) {
+        if get_initial_board(&mut life, &key_rx, board_height, &prefabs, &board_save_status) {
             cursor_move(0, (board_height + 2) as u16);
             break;
         }
@@ -140,6 +122,7 @@ fn run_life() {
         life.reset();
         println!("\n\r\n\r\n\r----------------------------------------------\n\r All cells died!\n\r----------------------------------------------\n\r");
         std::thread::sleep(std::time::Duration::from_millis(1500));
+        board_save_status = None;
     }
 
     kill_tx.send(()).unwrap();
@@ -149,18 +132,18 @@ fn run_life() {
     cursor_move(0, (board_height + 2) as u16);
 }
 
-fn get_saved_board(path: &Path) -> Option<life::Board> {
+fn get_saved_board(path: &Path) -> Result<life::Board, String> {
     let mut path_buf = PathBuf::new();
     path_buf.push("./saves/");
     path_buf.push(path.to_str().unwrap().to_string() + ".life");
 
     if !path_buf.as_path().exists() {
-        return None;
+        return Err(String::from("No such board save"));
     }
 
     match life::loader::load(path_buf.as_path().to_str().unwrap()) {
-        Ok(board) => Some(board),
-        Err(_) => None,
+        Ok(board) => Ok(board),
+        Err(_) => Err(String::from("Failed to process save")),
     }
 }
 
@@ -175,6 +158,7 @@ fn get_initial_board(
     rx: &mpsc::Receiver<event::KeyCode>,
     board_height: usize,
     prefabs: &[Prefab],
+    board_save_status: &Option<String>,
 ) -> bool {
     // print setup board
     reprint_board(life);
@@ -197,6 +181,10 @@ fn get_initial_board(
         stdout().flush().unwrap();
         cursor_move(prev_x, prev_y);
     };
+
+    if let Some(msg) = board_save_status {
+        status(Some(format!("Failed to load the requested board save: {}", msg)));
+    }
 
     print_cursor();
     loop {
