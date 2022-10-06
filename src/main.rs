@@ -27,17 +27,7 @@ fn run_life() {
         terminal::size().unwrap().1 as usize,
     );
 
-    let check_x = (config.board_width + 1) * 2 > term_size.0;
-    let check_y = config.board_height + 3 > term_size.1;
-    if check_x || check_y {
-        eprintln!(
-            "Error: terminal not large enough for specified dimensions. x: {}, y: {}",
-            check_x, check_y
-        );
-        std::process::exit(-1);
-    }
-
-    let (board_width, board_height) = if config.board_width == 0 && config.board_height == 0 {
+    let (mut board_width, mut board_height) = if config.board_width == 0 && config.board_height == 0 {
         (term_size.0 / 2 - (2 - term_size.0 % 2), term_size.1 - 3)
     } else {
         (config.board_width, config.board_height)
@@ -47,7 +37,18 @@ fn run_life() {
     let board = match config.save_name {
         Some(name) => {
             match get_saved_board(Path::new(&name)) {
-                Ok(board) => Some(board),
+                Ok(board) => {
+                    let check_x = (board.width() + 1) * 2 > term_size.0;
+                    let check_y = board.height() + 3 > term_size.1;
+                    if check_x || check_y {
+                        board_save_status = Some(String::from("Terminal not large enough"));
+                        None
+                    } else {
+                        board_width = board.width();
+                        board_height = board.height();
+                        Some(board)
+                    }
+                }
                 Err(e) => {
                     board_save_status = Some(e);
                     None
@@ -56,6 +57,16 @@ fn run_life() {
         }
         None => None
     };
+
+    let check_x = (board_width + 1) * 2 > term_size.0;
+    let check_y = board_height + 3 > term_size.1;
+    if check_x || check_y {
+        eprintln!(
+            "Error: terminal not large enough for specified dimensions. x: {}, y: {}",
+            check_x, check_y
+        );
+        std::process::exit(-1);
+    }
 
     let mut life = Life::new(
         (board_width, board_height),
@@ -422,8 +433,7 @@ fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
     stdout().execute(cursor::MoveLeft(1)).unwrap();
 }
 
-fn get_cmd_input<T>(prompt: &str, board_height: usize) -> Result<T, <T as FromStr>::Err>
-    where T: FromStr
+fn get_cmd_input<T: FromStr>(prompt: &str, board_height: usize) -> Result<T, <T as FromStr>::Err>
 {
     cursor_move(0, (board_height + 2) as u16);
     terminal::disable_raw_mode().unwrap();

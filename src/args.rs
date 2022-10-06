@@ -18,6 +18,8 @@ impl Config {
         if !use_args && len != 1 {
             println!("USAGE: {} [width] [height] [dead_cell] [alive_cell] [is_rand] OPTIONAL: [save_file]\nNOTE: use these chars in place of ones that can't be used in cmd args (`_` => ' ', 'h' => '#', 'a' => '`', 't' => '@')\nSet the width and height to 0 for fullscreen", args[0]);
             std::process::exit(-1);
+        } else if len == 1 {
+            println!("Set the width and height to 0 for fullscreen");
         }
 
         let board_width = if use_args {
@@ -32,28 +34,16 @@ impl Config {
             Self::input("Enter a board height:")
         };
 
-        let dead_cell = match if use_args {
+        let dead_cell = if use_args {
             args[3].parse().expect("Failed to parse dead cell char")
         } else {
             Self::input("Enter a dead cell char:")
-        } {
-            '_' => ' ',
-            'h' => '#',
-            'a' => '`',
-            't' => '@',
-            c => c,
         };
 
-        let alive_cell = match if use_args {
+        let alive_cell = if use_args {
             args[4].parse().expect("Failed to parse alive cell char")
         } else {
             Self::input("Enter an alive cell char:")
-        } {
-            '_' => ' ',
-            'h' => '#',
-            'a' => '`',
-            't' => '@',
-            c => c,
         };
 
         let is_rand = if use_args {
@@ -89,19 +79,19 @@ impl Config {
         where <T as FromStr>::Err: Debug
     {
         println!("{}", prompt);
-        let mut res = None;
+        let mut ret = None;
 
-        while let None = res {
+        while let None = ret {
             let mut in_str = String::new();
             std::io::stdin().read_line(&mut in_str).unwrap();
             let parsed = in_str.trim().parse();
             if parsed.is_err() {
                 println!("Failed to parse. Please try again.");
             } else {
-                res = Some(parsed.unwrap());
+                ret = Some(parsed.unwrap());
             }
         }
 
-        res.unwrap()
+        ret.unwrap()
     }
 }

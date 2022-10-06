@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 crossterm = "0.24.0"
 rand = "0.8.5"
-dyn_array = "0.1.2"
+dyn_array = "0.1.3"

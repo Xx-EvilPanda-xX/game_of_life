@@ -206,7 +206,6 @@ impl Life {
 
     pub fn tick(&mut self) {
         if self.dead {
-            println!("Board is dead!\n");
             return;
         }
 
@@ -249,29 +248,6 @@ impl Life {
     }
 
     fn alive_neighbors(pos: Pos, board: &Board) -> usize {
-        // cool iterator stuff but slow
-
-        // board.cells.iter().enumerate().filter(|(i, _)| {
-        //     let x1 = (i % board.width) as isize;
-        //     let y1 = (i / board.width) as isize;
-        //     let x2 = pos.x as isize;
-        //     let y2 = pos.y as isize;
-
-        //     if x1 == x2 && y1 == y2 {
-        //         return false;
-        //     }
-
-        //     ((x1 - x2).abs() <= 1) &&
-        //     ((y1 - y2).abs() <= 1)
-        // }).into_iter().filter(|(_, cell)| {
-        //     match cell {
-        //         Cell::Dead => false,
-        //         Cell::Alive => true
-        //     }
-        // }).count()
-
-        // fast but boring
-
         let at_pos = |x, y| Life::get_board_cell(Pos { x, y }, board).unwrap_or(Cell::Dead);
 
         let mut neighbors = [Cell::Dead; 8];
