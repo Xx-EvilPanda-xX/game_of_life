@@ -105,6 +105,7 @@ fn run_life() {
         }
         life.save_state();
         clear();
+        board_save_status = None;
 
         while !life.is_dead() {
             life.tick();
@@ -133,7 +134,6 @@ fn run_life() {
         life.reset();
         println!("\n\r\n\r\n\r----------------------------------------------\n\r All cells died!\n\r----------------------------------------------\n\r");
         std::thread::sleep(std::time::Duration::from_millis(1500));
-        board_save_status = None;
     }
 
     kill_tx.send(()).unwrap();
@@ -149,7 +149,7 @@ fn get_saved_board(path: &Path) -> Result<life::Board, String> {
     path_buf.push(path.to_str().unwrap().to_string() + ".life");
 
     if !path_buf.as_path().exists() {
-        return Err(String::from("No such board save"));
+        return Err(format!("No such board save `{}`", path.to_str().unwrap()));
     }
 
     match life::loader::load(path_buf.as_path().to_str().unwrap()) {
@@ -247,7 +247,8 @@ fn get_initial_board(
 
                     let prev_cursor_pos = cursor::position().unwrap();
                     status(Some(String::new()));
-                    let input: String = get_cmd_input("Please enter a name for the board to be saved as:", board_height).unwrap();
+                    cursor_move(0, (board_height + 2) as u16);
+                    let input: String = get_cmd_input("Please enter a name for the board to be saved as").unwrap();
                     let mut path = PathBuf::new();
                     path.push("./saves/");
                     path.push(input + ".life");
@@ -311,16 +312,17 @@ fn get_initial_board(
 
 fn fill_board_rect(life: &mut Life, cell: Cell, board_height: usize, status: &mut impl FnMut(Option<String>)) {
     let get_dim = |s| {
-        let mut x = get_cmd_input(s, board_height);
+        let mut x = get_cmd_input(s);
         while x.is_err() {
             print_to_cmd("Failed to parse. Please try again.");
-            x = get_cmd_input(s, board_height);
+            x = get_cmd_input(s);
         }
         x.unwrap()
     };
 
     let prev_cursor_pos = cursor::position().unwrap();
     status(Some(String::new()));
+    cursor_move(0, (board_height + 2) as u16);
     let lr_offset = Pos {
         x: get_dim("width:"),
         y: get_dim("height:"),
@@ -433,9 +435,8 @@ fn print_to_board(cell_chars: (char, char), cell: Result<Cell, ()>) {
     stdout().execute(cursor::MoveLeft(1)).unwrap();
 }
 
-fn get_cmd_input<T: FromStr>(prompt: &str, board_height: usize) -> Result<T, <T as FromStr>::Err>
+fn get_cmd_input<T: FromStr>(prompt: &str) -> Result<T, <T as FromStr>::Err>
 {
-    cursor_move(0, (board_height + 2) as u16);
     terminal::disable_raw_mode().unwrap();
     println!("{}", prompt);
     let mut input = String::new();

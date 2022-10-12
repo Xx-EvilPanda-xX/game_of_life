@@ -78,13 +78,15 @@ impl Config {
     fn input<T: FromStr>(prompt: &str) -> T
         where <T as FromStr>::Err: Debug
     {
-        println!("{}", prompt);
+        let type_name = std::any::type_name::<T>();
+        println!("{} ({})", prompt, type_name.split_at(type_name.rfind("::").map_or(0, |i| i + 2)).1);
         let mut ret = None;
 
         while let None = ret {
             let mut in_str = String::new();
             std::io::stdin().read_line(&mut in_str).unwrap();
-            let parsed = in_str.trim().parse();
+            let pred = ['\n', '\r'];
+            let parsed = in_str.trim_matches(&pred[..]).parse();
             if parsed.is_err() {
                 println!("Failed to parse. Please try again.");
             } else {

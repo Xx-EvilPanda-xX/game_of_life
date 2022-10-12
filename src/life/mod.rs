@@ -188,8 +188,8 @@ impl Life {
     }
 
     pub fn fill_rect(&mut self, ul: Pos, lr: Pos, cell: Cell) -> bool {
-        if ul.x >= self.board.width() || ul.y >= self.board.height()
-            || lr.x >= self.board.width() || lr.y >= self.board.height()
+        if ul.x > self.board.width() || ul.y > self.board.height()
+            || lr.x > self.board.width() || lr.y > self.board.height()
             || lr.x <= ul.x || lr.y <= ul.y
         {
             return false;
