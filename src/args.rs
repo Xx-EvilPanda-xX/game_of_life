@@ -80,9 +80,8 @@ impl Config {
     {
         let type_name = std::any::type_name::<T>();
         println!("{} ({})", prompt, type_name.split_at(type_name.rfind("::").map_or(0, |i| i + 2)).1);
-        let mut ret = None;
 
-        while let None = ret {
+        loop {
             let mut in_str = String::new();
             std::io::stdin().read_line(&mut in_str).unwrap();
             let pred = ['\n', '\r'];
@@ -90,10 +89,8 @@ impl Config {
             if parsed.is_err() {
                 println!("Failed to parse. Please try again.");
             } else {
-                ret = Some(parsed.unwrap());
+                break parsed.unwrap();
             }
         }
-
-        ret.unwrap()
     }
 }

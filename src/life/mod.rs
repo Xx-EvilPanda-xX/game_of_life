@@ -138,14 +138,14 @@ impl Life {
     }
 
     pub fn save_state(&mut self) {
-        for (i, cell) in &self.board {
-            self.inital_state[i] = *cell;
+        for (i, cell) in &mut self.inital_state {
+            *cell = self.board[i];
         }
     }
 
     pub fn load_inital(&mut self) {
-        for (i, cell) in &self.inital_state {
-            self.board[i] = *cell;
+        for (i, cell) in &mut self.board {
+            *cell = self.inital_state[i];
         }
     }
 
