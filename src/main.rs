@@ -1,4 +1,4 @@
-use crossterm::{cursor, event, terminal, ExecutableCommand};
+use crossterm::{cursor, event::{self, KeyCode}, terminal, ExecutableCommand};
 use life::prefab;
 use life::prefab::Prefab;
 use life::Cell;
@@ -117,13 +117,13 @@ fn run_life() {
 
             while let Ok(code) = key_rx.try_recv() {
                 match code {
-                    event::KeyCode::Char('r') => {
+                    KeyCode::Char('r') => {
                         life.reset();
                         continue 'outer;
                     }
-                    event::KeyCode::Up => tick_delay /= 2,
-                    event::KeyCode::Down => tick_delay *= 2,
-                    event::KeyCode::Esc => break 'outer,
+                    KeyCode::Up => tick_delay /= 2,
+                    KeyCode::Down => tick_delay *= 2,
+                    KeyCode::Esc => break 'outer,
                     _ => {}
                 }
 
@@ -203,7 +203,7 @@ fn get_initial_board(
             let char_cells = (life.dead_cell, life.alive_cell);
 
             match code {
-                event::KeyCode::Up => {
+                KeyCode::Up => {
                     if life.cursor_pos.y > 0 {
                         remove_cursor();
                         stdout().execute(cursor::MoveUp(1)).unwrap();
@@ -211,7 +211,7 @@ fn get_initial_board(
                         print_cursor();
                     }
                 }
-                event::KeyCode::Down => {
+                KeyCode::Down => {
                     if life.cursor_pos.y < life.dims().1 - 1 {
                         remove_cursor();
                         stdout().execute(cursor::MoveDown(1)).unwrap();
@@ -219,7 +219,7 @@ fn get_initial_board(
                         print_cursor();
                     }
                 }
-                event::KeyCode::Left => {
+                KeyCode::Left => {
                     if life.cursor_pos.x > 0 {
                         remove_cursor();
                         stdout().execute(cursor::MoveLeft(2)).unwrap();
@@ -227,7 +227,7 @@ fn get_initial_board(
                         print_cursor();
                     }
                 }
-                event::KeyCode::Right => {
+                KeyCode::Right => {
                     if life.cursor_pos.x < life.dims().0 - 1 {
                         remove_cursor();
                         stdout().execute(cursor::MoveRight(2)).unwrap();
@@ -235,12 +235,12 @@ fn get_initial_board(
                         print_cursor();
                     }
                 }
-                event::KeyCode::Char(' ') => {
+                KeyCode::Char(' ') => {
                     if let InputMode::Toggle = input_mode {
                         print_to_board(char_cells, life.toggle_cell(life.cursor_pos));
                     }
                 }
-                event::KeyCode::Char('s') => {
+                KeyCode::Char('s') => {
                     if !Path::new("./saves/").exists() {
                         std::fs::create_dir("saves").unwrap();
                     }
@@ -259,32 +259,32 @@ fn get_initial_board(
 
                     print_board_and_restore_cursor(life, Some(prev_cursor_pos), &mut status);
                 }
-                event::KeyCode::Char('1') => prefab(prefabs, 0, life, &mut status, rx),
-                event::KeyCode::Char('2') => prefab(prefabs, 1, life, &mut status, rx),
-                event::KeyCode::Char('3') => prefab(prefabs, 2, life, &mut status, rx),
-                event::KeyCode::Char('4') => prefab(prefabs, 3, life, &mut status, rx),
-                event::KeyCode::Char('5') => prefab(prefabs, 4, life, &mut status, rx),
-                event::KeyCode::Char('6') => prefab(prefabs, 5, life, &mut status, rx),
-                event::KeyCode::Char('7') => prefab(prefabs, 6, life, &mut status, rx),
-                event::KeyCode::Char('8') => prefab(prefabs, 7, life, &mut status, rx),
-                event::KeyCode::Char('9') => prefab(prefabs, 8, life, &mut status, rx),
-                event::KeyCode::Char('0') => prefab(prefabs, 9, life, &mut status, rx),
-                event::KeyCode::Char('q') => {
+                KeyCode::Char('1') => prefab(prefabs, 0, life, &mut status, rx),
+                KeyCode::Char('2') => prefab(prefabs, 1, life, &mut status, rx),
+                KeyCode::Char('3') => prefab(prefabs, 2, life, &mut status, rx),
+                KeyCode::Char('4') => prefab(prefabs, 3, life, &mut status, rx),
+                KeyCode::Char('5') => prefab(prefabs, 4, life, &mut status, rx),
+                KeyCode::Char('6') => prefab(prefabs, 5, life, &mut status, rx),
+                KeyCode::Char('7') => prefab(prefabs, 6, life, &mut status, rx),
+                KeyCode::Char('8') => prefab(prefabs, 7, life, &mut status, rx),
+                KeyCode::Char('9') => prefab(prefabs, 8, life, &mut status, rx),
+                KeyCode::Char('0') => prefab(prefabs, 9, life, &mut status, rx),
+                KeyCode::Char('q') => {
                     input_mode = InputMode::Toggle;
                     status(Some(String::from("Input mode: Toggle")));
                 }
-                event::KeyCode::Char('w') => {
+                KeyCode::Char('w') => {
                     input_mode = InputMode::SetAlive;
                     status(Some(String::from("Input mode: SetAlive")));
                 }
-                event::KeyCode::Char('e') => {
+                KeyCode::Char('e') => {
                     input_mode = InputMode::SetDead;
                     status(Some(String::from("Input mode: SetDead")));
                 }
-                event::KeyCode::Char('c') => fill_board_rect(life, Cell::Dead, board_height, &mut status),
-                event::KeyCode::Char('f') => fill_board_rect(life, Cell::Alive, board_height, &mut status),
-                event::KeyCode::Enter => break,
-                event::KeyCode::Esc => {
+                KeyCode::Char('c') => fill_board_rect(life, Cell::Dead, board_height, &mut status),
+                KeyCode::Char('f') => fill_board_rect(life, Cell::Alive, board_height, &mut status),
+                KeyCode::Enter => break,
+                KeyCode::Esc => {
                     status(Some(String::new()));
                     return true;
                 }
@@ -363,19 +363,19 @@ fn print_around_cursor(c1: char, c2: char) {
     stdout().flush().unwrap();
 }
 
-fn get_prefab_rotation(rx: &mpsc::Receiver<event::KeyCode>) -> Option<prefab::Rotation> {
+fn get_prefab_rotation(rx: &mpsc::Receiver<KeyCode>) -> Option<prefab::Rotation> {
     loop {
         if let Ok(code) = rx.recv() {
             match code {
-                event::KeyCode::Up => return Some(prefab::Rotation::Up),
-                event::KeyCode::Down => return Some(prefab::Rotation::Down),
-                event::KeyCode::Left => return Some(prefab::Rotation::Left),
-                event::KeyCode::Right => return Some(prefab::Rotation::Right),
-                event::KeyCode::Char('w') => return Some(prefab::Rotation::UpFlipped),
-                event::KeyCode::Char('s') => return Some(prefab::Rotation::DownFlipped),
-                event::KeyCode::Char('a') => return Some(prefab::Rotation::LeftFlipped),
-                event::KeyCode::Char('d') => return Some(prefab::Rotation::RightFlipped),
-                event::KeyCode::Esc => return None,
+                KeyCode::Up => return Some(prefab::Rotation::Up),
+                KeyCode::Down => return Some(prefab::Rotation::Down),
+                KeyCode::Left => return Some(prefab::Rotation::Left),
+                KeyCode::Right => return Some(prefab::Rotation::Right),
+                KeyCode::Char('w') => return Some(prefab::Rotation::UpFlipped),
+                KeyCode::Char('s') => return Some(prefab::Rotation::DownFlipped),
+                KeyCode::Char('a') => return Some(prefab::Rotation::LeftFlipped),
+                KeyCode::Char('d') => return Some(prefab::Rotation::RightFlipped),
+                KeyCode::Esc => return None,
                 _ => continue,
             }
         }

@@ -47,9 +47,9 @@ dependencies = [
 
 [[package]]
 name = "dyn_array"
-version = "0.1.4"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "835af08941020040acda04463a86a9dd12dd7a6348bc3d2a3fe06506cf3a7c90"
+checksum = "a8fbc2e230f93d5a8d7ddd68691c4e514f450a4919b9ad9bca7da6414fe8d960"
 
 [[package]]
 name = "game_of_life"
